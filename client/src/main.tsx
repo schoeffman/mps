@@ -5,6 +5,8 @@ import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
 import Root from "./routes/root";
 import Home from "./routes/home";
 import Users from "./routes/users";
+import Teams from "./routes/teams";
+import TeamDetail from "./routes/team-detail";
 import "./index.css";
 
 const apolloClient = new ApolloClient({
@@ -19,6 +21,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: "users", element: <Users /> },
+      { path: "teams", element: <Teams /> },
+      { path: "teams/:id", element: <TeamDetail /> },
     ],
   },
 ]);
