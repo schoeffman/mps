@@ -1,5 +1,5 @@
 import { useMutation, gql } from "@apollo/client";
-import { GET_USERS } from "@/routes/users";
+import { GET_PROJECTS } from "@/routes/projects";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,21 +14,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const DELETE_USER = gql`
-  mutation DeleteUser($id: Int!) {
-    deleteUser(id: $id)
+const DELETE_PROJECT = gql`
+  mutation DeleteProject($id: Int!) {
+    deleteProject(id: $id)
   }
 `;
 
-export function DeleteUserButton({
-  userId,
-  userName,
+export function DeleteProjectButton({
+  projectId,
+  projectName,
 }: {
-  userId: number;
-  userName: string;
+  projectId: number;
+  projectName: string;
 }) {
-  const [deleteUser] = useMutation(DELETE_USER, {
-    refetchQueries: [{ query: GET_USERS }],
+  const [deleteProject] = useMutation(DELETE_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
   });
 
   return (
@@ -40,9 +40,9 @@ export function DeleteUserButton({
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete user</AlertDialogTitle>
+          <AlertDialogTitle>Delete project</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete {userName}? This action cannot be
+            Are you sure you want to delete {projectName}? This action cannot be
             undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -52,8 +52,8 @@ export function DeleteUserButton({
             <Button
               variant="destructive"
               onClick={() =>
-                deleteUser({ variables: { id: userId } }).catch((err) =>
-                  alert(err.message),
+                deleteProject({ variables: { id: projectId } }).catch(
+                  (err) => alert(err.message),
                 )
               }
             >

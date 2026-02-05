@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, unique } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
@@ -32,3 +32,44 @@ export const teamMembers = sqliteTable("team_members", {
     .notNull()
     .references(() => users.id),
 });
+
+export const projects = sqliteTable("projects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  targetDate: text("target_date").notNull(),
+  driId: integer("dri_id")
+    .notNull()
+    .references(() => users.id),
+  status: text("status").notNull().default("Explore"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const projectMembers = sqliteTable("project_members", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+});
+
+export const scheduleAssignments = sqliteTable(
+  "schedule_assignments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    weekStart: text("week_start").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [unique().on(table.userId, table.weekStart)],
+);

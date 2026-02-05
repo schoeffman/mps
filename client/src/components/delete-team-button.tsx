@@ -51,7 +51,11 @@ export function DeleteTeamButton({
           <AlertDialogAction asChild>
             <Button
               variant="destructive"
-              onClick={() => deleteTeam({ variables: { id: teamId } })}
+              onClick={() =>
+                deleteTeam({ variables: { id: teamId } }).catch((err) =>
+                  alert(err.message),
+                )
+              }
             >
               Delete
             </Button>

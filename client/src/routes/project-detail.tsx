@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
-import { GET_TEAMS } from "@/routes/teams";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { GET_PROJECTS } from "@/routes/projects";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EditTeamDialog } from "@/components/edit-team-dialog";
+import { EditProjectDialog } from "@/components/edit-project-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,15 +25,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const GET_TEAM = gql`
-  query GetTeam($id: Int!) {
-    team(id: $id) {
+const GET_PROJECT = gql`
+  query GetProject($id: Int!) {
+    project(id: $id) {
       id
       name
-      teamLead {
+      targetDate
+      dri {
         id
         fullName
       }
+      status
       members {
         id
         fullName
@@ -46,9 +48,9 @@ const GET_TEAM = gql`
   }
 `;
 
-const DELETE_TEAM = gql`
-  mutation DeleteTeam($id: Int!) {
-    deleteTeam(id: $id)
+const DELETE_PROJECT = gql`
+  mutation DeleteProject($id: Int!) {
+    deleteProject(id: $id)
   }
 `;
 
@@ -62,38 +64,38 @@ function formatEnum(value: string) {
   return enumLabels[value] ?? value;
 }
 
-export default function TeamDetail() {
+export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { loading, error, data } = useQuery(GET_TEAM, {
+  const { loading, error, data } = useQuery(GET_PROJECT, {
     variables: { id: Number(id) },
   });
-  const [deleteTeam] = useMutation(DELETE_TEAM, {
-    refetchQueries: [{ query: GET_TEAMS }],
+  const [deleteProject] = useMutation(DELETE_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
   });
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
-  if (!data?.team) return <p>Team not found.</p>;
+  if (!data?.project) return <p>Project not found.</p>;
 
-  const { team } = data;
+  const { project } = data;
 
   async function handleDelete() {
-    await deleteTeam({ variables: { id: Number(id) } });
-    navigate("/teams");
+    await deleteProject({ variables: { id: Number(id) } });
+    navigate("/projects");
   }
 
   return (
     <>
       <div className="flex items-center gap-2 mb-4">
         <Button variant="ghost" size="icon-sm" asChild>
-          <Link to="/teams">
+          <Link to="/projects">
             <ArrowLeft />
           </Link>
         </Button>
-        <h1 className="text-2xl font-semibold">{team.name}</h1>
+        <h1 className="text-2xl font-semibold">{project.name}</h1>
         <div className="flex gap-1 ml-2">
-          <EditTeamDialog team={team} />
+          <EditProjectDialog project={project} />
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="icon-xs">
@@ -102,9 +104,9 @@ export default function TeamDetail() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete team</AlertDialogTitle>
+                <AlertDialogTitle>Delete project</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete {team.name}? This action cannot be undone.
+                  Are you sure you want to delete {project.name}? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -121,11 +123,13 @@ export default function TeamDetail() {
       </div>
 
       <div className="mb-6 text-sm text-muted-foreground space-y-1">
-        <p>Lead: {team.teamLead.fullName}</p>
-        <p>Created: {new Date(team.createdAt).toLocaleDateString()}</p>
+        <p>DRI: {project.dri.fullName}</p>
+        <p>Status: {project.status}</p>
+        <p>Target Date: {new Date(project.targetDate).toLocaleDateString()}</p>
+        <p>Created: {new Date(project.createdAt).toLocaleDateString()}</p>
       </div>
 
-      <h2 className="text-lg font-semibold mb-2">Members</h2>
+      <h2 className="text-lg font-semibold mb-2">Team Members</h2>
       <Table>
         <TableHeader>
           <TableRow>
@@ -137,15 +141,15 @@ export default function TeamDetail() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {team.members.map((member: { id: number; fullName: string; craftAbility: string; jobLevel: string; craftFocus: string }) => (
+          {project.members.map((member: { id: number; fullName: string; craftAbility: string; jobLevel: string; craftFocus: string }) => (
             <TableRow key={member.id}>
               <TableCell className="font-medium">{member.fullName}</TableCell>
               <TableCell>{formatEnum(member.craftAbility)}</TableCell>
               <TableCell>{member.jobLevel}</TableCell>
               <TableCell>{formatEnum(member.craftFocus)}</TableCell>
               <TableCell>
-                {member.id === team.teamLead.id ? (
-                  <Badge>Lead</Badge>
+                {member.id === project.dri.id ? (
+                  <Badge>DRI</Badge>
                 ) : (
                   <Badge variant="secondary">Member</Badge>
                 )}

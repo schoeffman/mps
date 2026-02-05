@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, gte, lte, and } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, scheduleAssignments } from "./db/schema.js";
 
 export const typeDefs = gql`
   enum CraftAbility {
@@ -71,11 +71,54 @@ export const typeDefs = gql`
     memberIds: [Int!]!
   }
 
+  enum ProjectStatus {
+    Explore
+    Make
+    Complete
+  }
+
+  type Project {
+    id: Int!
+    name: String!
+    targetDate: String!
+    dri: User!
+    status: ProjectStatus!
+    members: [User!]!
+    createdAt: String!
+  }
+
+  input CreateProjectInput {
+    name: String!
+    targetDate: String!
+    driId: Int!
+    status: ProjectStatus!
+    memberIds: [Int!]!
+  }
+
+  input UpdateProjectInput {
+    name: String!
+    targetDate: String!
+    driId: Int!
+    status: ProjectStatus!
+    memberIds: [Int!]!
+  }
+
+  type ScheduleAssignment {
+    id: Int!
+    userId: Int!
+    projectId: Int!
+    weekStart: String!
+  }
+
   type Query {
     hello: String
     users: [User!]!
+    user(id: Int!): User
     teams: [Team!]!
     team(id: Int!): Team
+    projects: [Project!]!
+    project(id: Int!): Project
+    scheduleAssignments(startDate: String!, endDate: String!): [ScheduleAssignment!]!
   }
 
   type Mutation {
@@ -85,6 +128,10 @@ export const typeDefs = gql`
     createTeam(input: CreateTeamInput!): Team!
     updateTeam(id: Int!, input: UpdateTeamInput!): Team!
     deleteTeam(id: Int!): Boolean!
+    createProject(input: CreateProjectInput!): Project!
+    updateProject(id: Int!, input: UpdateProjectInput!): Project!
+    deleteProject(id: Int!): Boolean!
+    setScheduleAssignment(userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
   }
 `;
 
@@ -146,12 +193,46 @@ function mapTeamFromDb(teamRow: typeof teams.$inferSelect) {
   };
 }
 
+function mapScheduleAssignmentFromDb(row: typeof scheduleAssignments.$inferSelect) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    projectId: row.projectId,
+    weekStart: row.weekStart,
+  };
+}
+
+function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
+  const driRow = db.select().from(users).where(eq(users.id, projectRow.driId)).get();
+  const memberRows = db
+    .select({ user: users })
+    .from(projectMembers)
+    .innerJoin(users, eq(projectMembers.userId, users.id))
+    .where(eq(projectMembers.projectId, projectRow.id))
+    .all();
+
+  return {
+    id: projectRow.id,
+    name: projectRow.name,
+    targetDate: projectRow.targetDate,
+    dri: driRow ? mapUserFromDb(driRow) : null,
+    status: projectRow.status,
+    members: memberRows.map((r) => mapUserFromDb(r.user)),
+    createdAt: projectRow.createdAt,
+  };
+}
+
 export const resolvers = {
   Query: {
     hello: () => "Hello world from Apollo Server!",
     users: () => {
       const rows = db.select().from(users).all();
       return rows.map(mapUserFromDb);
+    },
+    user: (_: unknown, { id }: { id: number }) => {
+      const row = db.select().from(users).where(eq(users.id, id)).get();
+      if (!row) return null;
+      return mapUserFromDb(row);
     },
     teams: () => {
       const rows = db.select().from(teams).all();
@@ -161,6 +242,23 @@ export const resolvers = {
       const row = db.select().from(teams).where(eq(teams.id, id)).get();
       if (!row) return null;
       return mapTeamFromDb(row);
+    },
+    projects: () => {
+      const rows = db.select().from(projects).all();
+      return rows.map(mapProjectFromDb);
+    },
+    project: (_: unknown, { id }: { id: number }) => {
+      const row = db.select().from(projects).where(eq(projects.id, id)).get();
+      if (!row) return null;
+      return mapProjectFromDb(row);
+    },
+    scheduleAssignments: (_: unknown, { startDate, endDate }: { startDate: string; endDate: string }) => {
+      const rows = db
+        .select()
+        .from(scheduleAssignments)
+        .where(and(gte(scheduleAssignments.weekStart, startDate), lte(scheduleAssignments.weekStart, endDate)))
+        .all();
+      return rows.map(mapScheduleAssignmentFromDb);
     },
   },
   Mutation: {
@@ -198,6 +296,25 @@ export const resolvers = {
       return mapUserFromDb(row);
     },
     deleteUser: (_: unknown, { id }: { id: number }) => {
+      // Check if user is a team lead
+      const teamLead = db.select().from(teams).where(eq(teams.teamLeadId, id)).get();
+      if (teamLead) {
+        throw new Error(`Cannot delete user: they are the lead of team "${teamLead.name}"`);
+      }
+
+      // Check if user is a project DRI
+      const projectDri = db.select().from(projects).where(eq(projects.driId, id)).get();
+      if (projectDri) {
+        throw new Error(`Cannot delete user: they are the DRI of project "${projectDri.name}"`);
+      }
+
+      // Remove from team memberships
+      db.delete(teamMembers).where(eq(teamMembers.userId, id)).run();
+
+      // Remove from project memberships
+      db.delete(projectMembers).where(eq(projectMembers.userId, id)).run();
+
+      // Delete the user
       const result = db.delete(users).where(eq(users.id, id)).run();
       return result.changes > 0;
     },
@@ -248,6 +365,99 @@ export const resolvers = {
     deleteTeam: (_: unknown, { id }: { id: number }) => {
       const result = db.delete(teams).where(eq(teams.id, id)).run();
       return result.changes > 0;
+    },
+    createProject: (
+      _: unknown,
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; memberIds: number[] } },
+    ) => {
+      // Ensure DRI is included in members
+      const allMemberIds = input.memberIds.includes(input.driId)
+        ? input.memberIds
+        : [...input.memberIds, input.driId];
+
+      const projectRow = db
+        .insert(projects)
+        .values({
+          name: input.name,
+          targetDate: input.targetDate,
+          driId: input.driId,
+          status: input.status,
+        })
+        .returning()
+        .get();
+
+      db.insert(projectMembers)
+        .values(allMemberIds.map((userId) => ({ projectId: projectRow.id, userId })))
+        .run();
+
+      return mapProjectFromDb(projectRow);
+    },
+    updateProject: (
+      _: unknown,
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; memberIds: number[] } },
+    ) => {
+      const allMemberIds = input.memberIds.includes(input.driId)
+        ? input.memberIds
+        : [...input.memberIds, input.driId];
+
+      const projectRow = db
+        .update(projects)
+        .set({
+          name: input.name,
+          targetDate: input.targetDate,
+          driId: input.driId,
+          status: input.status,
+        })
+        .where(eq(projects.id, id))
+        .returning()
+        .get();
+
+      // Replace all memberships
+      db.delete(projectMembers).where(eq(projectMembers.projectId, id)).run();
+      db.insert(projectMembers)
+        .values(allMemberIds.map((userId) => ({ projectId: id, userId })))
+        .run();
+
+      return mapProjectFromDb(projectRow);
+    },
+    deleteProject: (_: unknown, { id }: { id: number }) => {
+      const result = db.delete(projects).where(eq(projects.id, id)).run();
+      return result.changes > 0;
+    },
+    setScheduleAssignment: (
+      _: unknown,
+      { userId, weekStart, projectId }: { userId: number; weekStart: string; projectId: number | null },
+    ) => {
+      if (projectId == null) {
+        db.delete(scheduleAssignments)
+          .where(and(eq(scheduleAssignments.userId, userId), eq(scheduleAssignments.weekStart, weekStart)))
+          .run();
+        return null;
+      }
+
+      // Upsert: try to find existing
+      const existing = db
+        .select()
+        .from(scheduleAssignments)
+        .where(and(eq(scheduleAssignments.userId, userId), eq(scheduleAssignments.weekStart, weekStart)))
+        .get();
+
+      if (existing) {
+        const row = db
+          .update(scheduleAssignments)
+          .set({ projectId })
+          .where(eq(scheduleAssignments.id, existing.id))
+          .returning()
+          .get();
+        return mapScheduleAssignmentFromDb(row);
+      }
+
+      const row = db
+        .insert(scheduleAssignments)
+        .values({ userId, projectId, weekStart })
+        .returning()
+        .get();
+      return mapScheduleAssignmentFromDb(row);
     },
   },
 };

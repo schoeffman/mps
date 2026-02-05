@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, Moon, Sun, Users, UsersRound } from "lucide-react";
+import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import {
   Sidebar,
@@ -48,6 +48,22 @@ export function AppSidebar() {
                   <NavLink to="/teams" className={({ isActive }) => isActive ? "font-semibold" : ""}>
                     <UsersRound className="size-4" />
                     Teams
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/projects" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <FolderKanban className="size-4" />
+                    Projects
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/schedule" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <CalendarDays className="size-4" />
+                    Schedule
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

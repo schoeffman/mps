@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -53,7 +54,11 @@ export function UsersList({ users }: { users: User[] }) {
       <TableBody>
         {users.map((user) => (
           <TableRow key={user.id}>
-            <TableCell className="font-medium">{user.fullName}</TableCell>
+            <TableCell className="font-medium">
+              <Link to={`/users/${user.id}`} className="hover:underline">
+                {user.fullName}
+              </Link>
+            </TableCell>
             <TableCell>{formatEnum(user.craftAbility)}</TableCell>
             <TableCell>{user.jobLevel}</TableCell>
             <TableCell>{formatEnum(user.craftFocus)}</TableCell>
