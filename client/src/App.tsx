@@ -1,5 +1,6 @@
 import { useQuery, gql } from "@apollo/client";
-import { Button } from "@/components/ui/button";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 const HELLO_QUERY = gql`
   query Hello {
@@ -10,14 +11,24 @@ const HELLO_QUERY = gql`
 export default function App() {
   const { loading, error, data } = useQuery(HELLO_QUERY);
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error.message}</p>;
-
   return (
-    <div>
-      <h1>MPS</h1>
-      <p>{data.hello}</p>
-      <Button>Click me</Button>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+        </header>
+        <main className="flex flex-1 flex-col gap-4 p-4">
+          {loading && <p>Loading...</p>}
+          {error && <p>Error: {error.message}</p>}
+          {data && (
+            <>
+              <h1>MPS</h1>
+              <p>{data.hello}</p>
+            </>
+          )}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
