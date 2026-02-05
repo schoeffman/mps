@@ -1,4 +1,5 @@
-import { Moon, Sun } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { Home, Moon, Sun, Users } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import {
   Sidebar,
@@ -27,10 +28,20 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton>Dashboard</SidebarMenuButton>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/" end className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <Home className="size-4" />
+                    Dashboard
+                  </NavLink>
+                </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>Settings</SidebarMenuButton>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/users" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <Users className="size-4" />
+                    Users
+                  </NavLink>
+                </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={toggleTheme}>
