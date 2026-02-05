@@ -1,4 +1,5 @@
 import { useQuery, gql } from "@apollo/client";
+import { Button } from "@/components/ui/button";
 
 const HELLO_QUERY = gql`
   query Hello {
@@ -16,6 +17,7 @@ export default function App() {
     <div>
       <h1>MPS</h1>
       <p>{data.hello}</p>
+      <Button>Click me</Button>
     </div>
   );
 }
