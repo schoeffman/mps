@@ -1,2 +1,2 @@
-# mps
-Manager Project Scheduler 
+# MPS
+MPS Project Scheduler 
