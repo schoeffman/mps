@@ -1,3 +1,5 @@
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import {
   Sidebar,
   SidebarHeader,
@@ -12,6 +14,8 @@ import {
 } from "@/components/ui/sidebar";
 
 export function AppSidebar() {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -27,6 +31,16 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton>Settings</SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={toggleTheme}>
+                  {theme === "dark" ? (
+                    <Sun className="size-4" />
+                  ) : (
+                    <Moon className="size-4" />
+                  )}
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
