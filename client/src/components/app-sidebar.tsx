@@ -61,9 +61,9 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to="/schedule" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                  <NavLink to="/schedules" className={({ isActive }) => isActive ? "font-semibold" : ""}>
                     <CalendarDays className="size-4" />
-                    Schedule
+                    Schedules
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

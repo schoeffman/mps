@@ -56,10 +56,23 @@ export const projectMembers = sqliteTable("project_members", {
     .references(() => users.id),
 });
 
+export const schedules = sqliteTable("schedules", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  year: integer("year").notNull(),
+  quarter: integer("quarter").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export const scheduleAssignments = sqliteTable(
   "schedule_assignments",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    scheduleId: integer("schedule_id")
+      .notNull()
+      .references(() => schedules.id, { onDelete: "cascade" }),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -71,5 +84,5 @@ export const scheduleAssignments = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
   },
-  (table) => [unique().on(table.userId, table.weekStart)],
+  (table) => [unique().on(table.scheduleId, table.userId, table.weekStart)],
 );

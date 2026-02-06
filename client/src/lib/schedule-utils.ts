@@ -1,11 +1,9 @@
 /**
- * Get the date range for the quarter containing `now`, extended to
+ * Get the date range for a given year/quarter, extended to
  * Monday/Sunday week boundaries.
  */
-export function getQuarterRange(now: Date): { startDate: string; endDate: string } {
-  const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
-  const quarterStartMonth = Math.floor(month / 3) * 3;
+export function getQuarterRange(year: number, quarter: number): { startDate: string; endDate: string } {
+  const quarterStartMonth = (quarter - 1) * 3;
 
   // First day of the quarter
   const qStart = new Date(year, quarterStartMonth, 1);

@@ -1,5 +1,5 @@
 import { db } from "./index.js";
-import { users, teams, teamMembers, projects, projectMembers, scheduleAssignments } from "./schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./schema.js";
 
 const seedUsers = [
   { fullName: "Alice Chen", craftAbility: "Engineering", jobLevel: "Senior", craftFocus: "Frontend" },
@@ -21,6 +21,7 @@ const seedUsers = [
 
 // Clear existing data (FK-safe order)
 db.delete(scheduleAssignments).run();
+db.delete(schedules).run();
 db.delete(projectMembers).run();
 db.delete(projects).run();
 db.delete(teamMembers).run();
@@ -131,6 +132,14 @@ const projectMemberships: { projectId: number; userId: number }[] = [
 db.insert(projectMembers).values(projectMemberships).run();
 console.log(`Seeded ${projectMemberships.length} project memberships.`);
 
+// Seed schedule
+const insertedSchedule = db
+  .insert(schedules)
+  .values({ name: "Q1 2026 Plan", year: 2026, quarter: 1 })
+  .returning()
+  .get();
+console.log(`Seeded schedule: ${insertedSchedule.name}`);
+
 // Seed schedule assignments (Q1 2026 weeks)
 const weeks = ["2026-01-05", "2026-01-12", "2026-01-19", "2026-01-26", "2026-02-02"];
 
@@ -192,6 +201,7 @@ const scheduleData: { userName: string; projectName: string; weekStart: string }
 ];
 
 const scheduleValues = scheduleData.map((s) => ({
+  scheduleId: insertedSchedule.id,
   userId: userByName[s.userName].id,
   projectId: projectByName[s.projectName].id,
   weekStart: s.weekStart,

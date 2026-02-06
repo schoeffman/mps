@@ -10,7 +10,8 @@ import TeamDetail from "./routes/team-detail";
 import UserDetail from "./routes/user-detail";
 import Projects from "./routes/projects";
 import ProjectDetail from "./routes/project-detail";
-import Schedule from "./routes/schedule";
+import Schedules from "./routes/schedules";
+import ScheduleDetail from "./routes/schedule-detail";
 import "./index.css";
 
 const apolloClient = new ApolloClient({
@@ -30,7 +31,8 @@ const router = createBrowserRouter([
       { path: "teams/:id", element: <TeamDetail /> },
       { path: "projects", element: <Projects /> },
       { path: "projects/:id", element: <ProjectDetail /> },
-      { path: "schedule", element: <Schedule /> },
+      { path: "schedules", element: <Schedules /> },
+      { path: "schedules/:id", element: <ScheduleDetail /> },
     ],
   },
 ]);

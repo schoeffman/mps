@@ -1,12 +1,14 @@
 import { useMemo } from "react";
 import { gql, useMutation } from "@apollo/client";
 import { formatWeekHeader } from "@/lib/schedule-utils";
+import { Badge } from "@/components/ui/badge";
 import { ScheduleCell } from "./schedule-cell";
 
 const SET_SCHEDULE_ASSIGNMENT = gql`
-  mutation SetScheduleAssignment($userId: Int!, $weekStart: String!, $projectId: Int) {
-    setScheduleAssignment(userId: $userId, weekStart: $weekStart, projectId: $projectId) {
+  mutation SetScheduleAssignment($scheduleId: Int!, $userId: Int!, $weekStart: String!, $projectId: Int) {
+    setScheduleAssignment(scheduleId: $scheduleId, userId: $userId, weekStart: $weekStart, projectId: $projectId) {
       id
+      scheduleId
       userId
       projectId
       weekStart
@@ -17,6 +19,7 @@ const SET_SCHEDULE_ASSIGNMENT = gql`
 interface Team {
   id: number;
   name: string;
+  teamLead: { id: number };
   members: { id: number; fullName: string }[];
 }
 
@@ -33,6 +36,7 @@ interface Assignment {
 }
 
 interface ScheduleGridProps {
+  scheduleId: number;
   teams: Team[];
   projects: Project[];
   assignments: Assignment[];
@@ -52,9 +56,9 @@ const PROJECT_COLORS = [
   "bg-teal-100 dark:bg-teal-900/40",
 ];
 
-export function ScheduleGrid({ teams, projects, assignments, weekStarts, startDate, endDate }: ScheduleGridProps) {
+export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, startDate, endDate }: ScheduleGridProps) {
   const [setAssignment] = useMutation(SET_SCHEDULE_ASSIGNMENT, {
-    refetchQueries: ["GetScheduleData"],
+    refetchQueries: ["GetScheduleDetail"],
   });
 
   // O(1) lookup: "userId-weekStart" → projectId
@@ -76,7 +80,7 @@ export function ScheduleGrid({ teams, projects, assignments, weekStarts, startDa
   }, [projects]);
 
   const handleAssign = (userId: number, weekStart: string, projectId: number | null) => {
-    setAssignment({ variables: { userId, weekStart, projectId } });
+    setAssignment({ variables: { scheduleId, userId, weekStart, projectId } });
   };
 
   return (
@@ -108,6 +112,9 @@ export function ScheduleGrid({ teams, projects, assignments, weekStarts, startDa
               {team.members.map((member) => (
                 <tr key={`member-${member.id}`} className="border-b">
                   <td className="sticky left-0 z-10 bg-background px-3 py-1.5 border-r whitespace-nowrap">
+                    {member.id === team.teamLead.id && (
+                      <Badge variant="outline" className="mr-1.5 text-[10px] px-1 py-0">TL</Badge>
+                    )}
                     {member.fullName}
                   </td>
                   {weekStarts.map((ws) => {
