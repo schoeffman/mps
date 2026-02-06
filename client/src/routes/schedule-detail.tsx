@@ -7,6 +7,7 @@ import { GET_SCHEDULES } from "@/routes/schedules";
 import { EditScheduleDialog } from "@/components/edit-schedule-dialog";
 import { getQuarterRange, getWeekStarts } from "@/lib/schedule-utils";
 import { ScheduleGrid } from "@/components/schedule-grid";
+import { ScheduleCapacityChart } from "@/components/schedule-capacity-chart";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,17 +91,20 @@ export default function ScheduleDetail() {
     skip: !startDate || !endDate,
   });
 
-  const availableCapacity = useMemo(() => {
-    if (!detailData || weekStarts.length === 0) return null;
+  const totalSlots = useMemo(() => {
+    if (!detailData || weekStarts.length === 0) return 0;
     const totalMembers = detailData.teams.reduce(
       (sum: number, t: { members: unknown[] }) => sum + t.members.length,
       0,
     );
-    const totalUserWeeks = totalMembers * weekStarts.length;
-    if (totalUserWeeks === 0) return null;
-    const assigned = detailData.scheduleAssignments.length;
-    return Math.round(((totalUserWeeks - assigned) / totalUserWeeks) * 100);
+    return totalMembers * weekStarts.length;
   }, [detailData, weekStarts]);
+
+  const availableCapacity = useMemo(() => {
+    if (totalSlots === 0 || !detailData) return null;
+    const assigned = detailData.scheduleAssignments.length;
+    return Math.round(((totalSlots - assigned) / totalSlots) * 100);
+  }, [detailData, totalSlots]);
 
   const [deleteSchedule] = useMutation(DELETE_SCHEDULE, {
     refetchQueries: [{ query: GET_SCHEDULES }],
@@ -166,15 +170,24 @@ export default function ScheduleDetail() {
       {detailLoading && <p>Loading grid...</p>}
       {detailError && <p className="text-destructive">Error: {detailError.message}</p>}
       {detailData && (
-        <ScheduleGrid
-          scheduleId={scheduleId}
-          teams={detailData.teams}
-          projects={detailData.projects}
-          assignments={detailData.scheduleAssignments}
-          weekStarts={weekStarts}
-          startDate={startDate}
-          endDate={endDate}
-        />
+        <>
+          <ScheduleGrid
+            scheduleId={scheduleId}
+            teams={detailData.teams}
+            projects={detailData.projects}
+            assignments={detailData.scheduleAssignments}
+            weekStarts={weekStarts}
+            startDate={startDate}
+            endDate={endDate}
+          />
+          {totalSlots > 0 && (
+            <ScheduleCapacityChart
+              projects={detailData.projects}
+              assignments={detailData.scheduleAssignments}
+              totalSlots={totalSlots}
+            />
+          )}
+        </>
       )}
     </div>
   );

@@ -144,6 +144,12 @@ export const typeDefs = gql`
     scheduleAssignments(scheduleId: Int!, startDate: String!, endDate: String!): [ScheduleAssignment!]!
   }
 
+  input BulkAssignmentInput {
+    userId: Int!
+    weekStart: String!
+    projectId: Int
+  }
+
   type Mutation {
     createUser(input: CreateUserInput!): User!
     updateUser(id: Int!, input: UpdateUserInput!): User!
@@ -158,6 +164,7 @@ export const typeDefs = gql`
     updateSchedule(id: Int!, input: UpdateScheduleInput!): Schedule!
     deleteSchedule(id: Int!): Boolean!
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
+    bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
   }
 `;
 
@@ -543,6 +550,44 @@ export const resolvers = {
         .returning()
         .get();
       return mapScheduleAssignmentFromDb(row);
+    },
+    bulkSetScheduleAssignments: (
+      _: unknown,
+      { scheduleId, assignments }: { scheduleId: number; assignments: { userId: number; weekStart: string; projectId: number | null }[] },
+    ) => {
+      for (const { userId, weekStart, projectId } of assignments) {
+        if (projectId == null) {
+          db.delete(scheduleAssignments)
+            .where(and(
+              eq(scheduleAssignments.scheduleId, scheduleId),
+              eq(scheduleAssignments.userId, userId),
+              eq(scheduleAssignments.weekStart, weekStart),
+            ))
+            .run();
+        } else {
+          const existing = db
+            .select()
+            .from(scheduleAssignments)
+            .where(and(
+              eq(scheduleAssignments.scheduleId, scheduleId),
+              eq(scheduleAssignments.userId, userId),
+              eq(scheduleAssignments.weekStart, weekStart),
+            ))
+            .get();
+
+          if (existing) {
+            db.update(scheduleAssignments)
+              .set({ projectId })
+              .where(eq(scheduleAssignments.id, existing.id))
+              .run();
+          } else {
+            db.insert(scheduleAssignments)
+              .values({ scheduleId, userId, projectId, weekStart })
+              .run();
+          }
+        }
+      }
+      return true;
     },
   },
 };

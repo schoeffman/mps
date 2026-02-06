@@ -20,9 +20,24 @@ interface ScheduleCellProps {
   projects: Project[];
   bgColor: string;
   onAssign: (userId: number, weekStart: string, projectId: number | null) => void;
+  isPaintMode: boolean;
+  activeProjectId: number | null | "eraser";
+  onPaintStart?: (userId: number, weekStart: string) => void;
+  onPaintEnter?: (userId: number, weekStart: string) => void;
 }
 
-export function ScheduleCell({ userId, weekStart, projectId, projects, bgColor, onAssign }: ScheduleCellProps) {
+export function ScheduleCell({
+  userId,
+  weekStart,
+  projectId,
+  projects,
+  bgColor,
+  onAssign,
+  isPaintMode,
+  activeProjectId,
+  onPaintStart,
+  onPaintEnter,
+}: ScheduleCellProps) {
   const handleChange = (value: string) => {
     if (value === NONE_VALUE) {
       onAssign(userId, weekStart, null);
@@ -30,6 +45,29 @@ export function ScheduleCell({ userId, weekStart, projectId, projects, bgColor, 
       onAssign(userId, weekStart, parseInt(value, 10));
     }
   };
+
+  if (isPaintMode) {
+    const projectName = projectId
+      ? projects.find((p) => p.id === projectId)?.name ?? "—"
+      : "—";
+
+    return (
+      <td
+        className={`border-r p-0.5 cursor-pointer select-none hover:ring-2 hover:ring-inset hover:ring-primary/50 ${bgColor}`}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          onPaintStart?.(userId, weekStart);
+        }}
+        onMouseEnter={() => {
+          onPaintEnter?.(userId, weekStart);
+        }}
+      >
+        <div className="w-full h-7 flex items-center justify-center text-xs truncate px-1">
+          {projectName}
+        </div>
+      </td>
+    );
+  }
 
   return (
     <td className={`border-r p-0.5 ${bgColor}`}>
