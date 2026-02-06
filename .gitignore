@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 server/data/*.db
 server/data/*.db-journal
 server/data/*.db-wal
+server/data/
