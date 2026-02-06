@@ -3,6 +3,7 @@ import { useMutation, useQuery, gql } from "@apollo/client";
 import { Pencil } from "lucide-react";
 import { GET_PROJECTS } from "@/routes/projects";
 import { GET_USERS } from "@/routes/users";
+import { PROJECT_COLOR_OPTIONS } from "@/lib/project-colors";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,7 @@ const UPDATE_PROJECT = gql`
         fullName
       }
       status
+      color
       members {
         id
         fullName
@@ -49,21 +51,24 @@ interface EditProjectDialogProps {
     targetDate: string;
     dri: { id: number; fullName: string };
     status: string;
+    color: string;
     members: { id: number; fullName: string }[];
   };
+  trigger?: React.ReactNode;
 }
 
-export function EditProjectDialog({ project }: EditProjectDialogProps) {
+export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(project.name);
   const [targetDate, setTargetDate] = useState(project.targetDate);
   const [status, setStatus] = useState(project.status);
+  const [color, setColor] = useState(project.color);
   const [memberIds, setMemberIds] = useState<number[]>(project.members.map((m) => m.id));
   const [driId, setDriId] = useState<string>(String(project.dri.id));
 
   const { data: usersData } = useQuery(GET_USERS);
   const [updateProject, { loading }] = useMutation(UPDATE_PROJECT, {
-    refetchQueries: [{ query: GET_PROJECTS }],
+    refetchQueries: [{ query: GET_PROJECTS }, "GetScheduleDetail"],
   });
 
   const allUsers: { id: number; fullName: string }[] = usersData?.users ?? [];
@@ -72,6 +77,7 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
     setName(project.name);
     setTargetDate(project.targetDate);
     setStatus(project.status);
+    setColor(project.color);
     setMemberIds(project.members.map((m) => m.id));
     setDriId(String(project.dri.id));
   }
@@ -100,7 +106,7 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, memberIds },
       },
     });
     setOpen(false);
@@ -111,9 +117,11 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-xs">
-          <Pencil />
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="icon-xs">
+            <Pencil />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -153,6 +161,23 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
                 <SelectItem value="Complete">Complete</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Color</Label>
+            <div className="flex gap-2 flex-wrap">
+              {PROJECT_COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  title={opt.label}
+                  onClick={() => setColor(opt.key)}
+                  className={`w-7 h-7 rounded-md border-2 transition-all cursor-pointer ${opt.chipBg} ${
+                    color === opt.key ? "ring-2 ring-primary ring-offset-1 scale-110" : "opacity-70 hover:opacity-100"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="grid gap-2">

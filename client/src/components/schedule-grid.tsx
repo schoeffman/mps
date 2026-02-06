@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { gql, useMutation } from "@apollo/client";
 import { formatWeekHeader } from "@/lib/schedule-utils";
+import { getProjectColor } from "@/lib/project-colors";
 import { Badge } from "@/components/ui/badge";
 import { ScheduleCell } from "./schedule-cell";
 import { RowProjectPicker } from "./row-project-picker";
@@ -33,6 +34,7 @@ interface Team {
 interface Project {
   id: number;
   name: string;
+  color: string;
 }
 
 interface Assignment {
@@ -52,27 +54,6 @@ interface ScheduleGridProps {
   endDate: string;
 }
 
-const PROJECT_COLORS = [
-  "bg-blue-100 dark:bg-blue-900/40",
-  "bg-green-100 dark:bg-green-900/40",
-  "bg-purple-100 dark:bg-purple-900/40",
-  "bg-amber-100 dark:bg-amber-900/40",
-  "bg-rose-100 dark:bg-rose-900/40",
-  "bg-cyan-100 dark:bg-cyan-900/40",
-  "bg-orange-100 dark:bg-orange-900/40",
-  "bg-teal-100 dark:bg-teal-900/40",
-];
-
-const PROJECT_CHIP_COLORS = [
-  "bg-blue-200 dark:bg-blue-800 border-blue-400 dark:border-blue-600",
-  "bg-green-200 dark:bg-green-800 border-green-400 dark:border-green-600",
-  "bg-purple-200 dark:bg-purple-800 border-purple-400 dark:border-purple-600",
-  "bg-amber-200 dark:bg-amber-800 border-amber-400 dark:border-amber-600",
-  "bg-rose-200 dark:bg-rose-800 border-rose-400 dark:border-rose-600",
-  "bg-cyan-200 dark:bg-cyan-800 border-cyan-400 dark:border-cyan-600",
-  "bg-orange-200 dark:bg-orange-800 border-orange-400 dark:border-orange-600",
-  "bg-teal-200 dark:bg-teal-800 border-teal-400 dark:border-teal-600",
-];
 
 export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, startDate, endDate }: ScheduleGridProps) {
   const [setAssignment] = useMutation(SET_SCHEDULE_ASSIGNMENT, {
@@ -98,21 +79,20 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     return map;
   }, [assignments]);
 
-  // Stable color per project
+  // Color maps derived from project.color
   const projectColorMap = useMemo(() => {
     const map = new Map<number, string>();
-    projects.forEach((p, i) => {
-      map.set(p.id, PROJECT_COLORS[i % PROJECT_COLORS.length]);
-    });
+    for (const p of projects) {
+      map.set(p.id, getProjectColor(p.color).cellBg);
+    }
     return map;
   }, [projects]);
 
-  // Chip color per project
   const projectChipColorMap = useMemo(() => {
     const map = new Map<number, string>();
-    projects.forEach((p, i) => {
-      map.set(p.id, PROJECT_CHIP_COLORS[i % PROJECT_CHIP_COLORS.length]);
-    });
+    for (const p of projects) {
+      map.set(p.id, getProjectColor(p.color).chipBg);
+    }
     return map;
   }, [projects]);
 

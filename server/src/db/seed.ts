@@ -84,10 +84,10 @@ console.log(`Seeded ${teamMemberships.length} team memberships.`);
 
 // Seed projects
 const seedProjects = [
-  { name: "Website Redesign", targetDate: "2026-04-15", driName: "Alice Chen", status: "Make" },
-  { name: "API v2 Migration", targetDate: "2026-05-01", driName: "Bob Martinez", status: "Explore" },
-  { name: "Mobile App Launch", targetDate: "2026-06-30", driName: "Hassan Ali", status: "Explore" },
-  { name: "Data Pipeline Upgrade", targetDate: "2026-03-15", driName: "Karen Liu", status: "Complete" },
+  { name: "Website Redesign", targetDate: "2026-04-15", driName: "Alice Chen", status: "Make", color: "blue" },
+  { name: "API v2 Migration", targetDate: "2026-05-01", driName: "Bob Martinez", status: "Explore", color: "green" },
+  { name: "Mobile App Launch", targetDate: "2026-06-30", driName: "Hassan Ali", status: "Explore", color: "purple" },
+  { name: "Data Pipeline Upgrade", targetDate: "2026-03-15", driName: "Karen Liu", status: "Complete", color: "amber" },
 ];
 
 const insertedProjects = db
@@ -98,6 +98,7 @@ const insertedProjects = db
       targetDate: p.targetDate,
       driId: userByName[p.driName].id,
       status: p.status,
+      color: p.color,
     })),
   )
   .returning()

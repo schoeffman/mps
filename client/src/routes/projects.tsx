@@ -13,6 +13,7 @@ export const GET_PROJECTS = gql`
         fullName
       }
       status
+      color
       members {
         id
         fullName

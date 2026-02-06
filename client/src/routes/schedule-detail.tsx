@@ -48,6 +48,17 @@ const GET_SCHEDULE_DETAIL = gql`
     projects {
       id
       name
+      targetDate
+      dri {
+        id
+        fullName
+      }
+      status
+      color
+      members {
+        id
+        fullName
+      }
     }
     scheduleAssignments(scheduleId: $scheduleId, startDate: $startDate, endDate: $endDate) {
       id

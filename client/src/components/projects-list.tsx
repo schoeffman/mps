@@ -17,6 +17,7 @@ interface Project {
   targetDate: string;
   dri: { id: number; fullName: string };
   status: string;
+  color: string;
   members: { id: number; fullName: string }[];
   createdAt: string;
 }

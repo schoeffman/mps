@@ -41,6 +41,7 @@ export const projects = sqliteTable("projects", {
     .notNull()
     .references(() => users.id),
   status: text("status").notNull().default("Explore"),
+  color: text("color").notNull().default("blue"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

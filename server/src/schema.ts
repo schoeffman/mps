@@ -83,6 +83,7 @@ export const typeDefs = gql`
     targetDate: String!
     dri: User!
     status: ProjectStatus!
+    color: String!
     members: [User!]!
     createdAt: String!
   }
@@ -92,6 +93,7 @@ export const typeDefs = gql`
     targetDate: String!
     driId: Int!
     status: ProjectStatus!
+    color: String!
     memberIds: [Int!]!
   }
 
@@ -100,6 +102,7 @@ export const typeDefs = gql`
     targetDate: String!
     driId: Int!
     status: ProjectStatus!
+    color: String!
     memberIds: [Int!]!
   }
 
@@ -261,6 +264,7 @@ function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     targetDate: projectRow.targetDate,
     dri: driRow ? mapUserFromDb(driRow) : null,
     status: projectRow.status,
+    color: projectRow.color,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     createdAt: projectRow.createdAt,
   };
@@ -425,7 +429,7 @@ export const resolvers = {
     },
     createProject: (
       _: unknown,
-      { input }: { input: { name: string; targetDate: string; driId: number; status: string; memberIds: number[] } },
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
     ) => {
       // Ensure DRI is included in members
       const allMemberIds = input.memberIds.includes(input.driId)
@@ -439,6 +443,7 @@ export const resolvers = {
           targetDate: input.targetDate,
           driId: input.driId,
           status: input.status,
+          color: input.color,
         })
         .returning()
         .get();
@@ -451,7 +456,7 @@ export const resolvers = {
     },
     updateProject: (
       _: unknown,
-      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; memberIds: number[] } },
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
     ) => {
       const allMemberIds = input.memberIds.includes(input.driId)
         ? input.memberIds
@@ -464,6 +469,7 @@ export const resolvers = {
           targetDate: input.targetDate,
           driId: input.driId,
           status: input.status,
+          color: input.color,
         })
         .where(eq(projects.id, id))
         .returning()

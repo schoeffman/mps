@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
 import { GET_USERS } from "@/routes/users";
+import { PROJECT_COLOR_OPTIONS } from "@/lib/project-colors";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +33,7 @@ const CREATE_PROJECT = gql`
         fullName
       }
       status
+      color
       members {
         id
         fullName
@@ -46,6 +48,7 @@ export function AddProjectDialog() {
   const [name, setName] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [status, setStatus] = useState("Explore");
+  const [color, setColor] = useState("blue");
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [driId, setDriId] = useState<string>("");
 
@@ -60,6 +63,7 @@ export function AddProjectDialog() {
     setName("");
     setTargetDate("");
     setStatus("Explore");
+    setColor("blue");
     setMemberIds([]);
     setDriId("");
   }
@@ -81,7 +85,7 @@ export function AddProjectDialog() {
     e.preventDefault();
     await createProject({
       variables: {
-        input: { name, targetDate, driId: Number(driId), status, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, memberIds },
       },
     });
     resetForm();
@@ -133,6 +137,23 @@ export function AddProjectDialog() {
                 <SelectItem value="Complete">Complete</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Color</Label>
+            <div className="flex gap-2 flex-wrap">
+              {PROJECT_COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  title={opt.label}
+                  onClick={() => setColor(opt.key)}
+                  className={`w-7 h-7 rounded-md border-2 transition-all cursor-pointer ${opt.chipBg} ${
+                    color === opt.key ? "ring-2 ring-primary ring-offset-1 scale-110" : "opacity-70 hover:opacity-100"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
 
           <div className="grid gap-2">

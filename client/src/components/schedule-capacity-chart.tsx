@@ -1,8 +1,15 @@
 import { useMemo } from "react";
+import { getProjectColor } from "@/lib/project-colors";
+import { EditProjectDialog } from "./edit-project-dialog";
 
 interface Project {
   id: number;
   name: string;
+  targetDate: string;
+  dri: { id: number; fullName: string };
+  status: string;
+  color: string;
+  members: { id: number; fullName: string }[];
 }
 
 interface Assignment {
@@ -18,17 +25,6 @@ interface ScheduleCapacityChartProps {
   totalSlots: number;
 }
 
-const CHART_COLORS = [
-  "#93c5fd", // blue-300
-  "#86efac", // green-300
-  "#c4b5fd", // purple-300
-  "#fcd34d", // amber-300
-  "#fda4af", // rose-300
-  "#67e8f9", // cyan-300
-  "#fdba74", // orange-300
-  "#5eead4", // teal-300
-];
-
 const REMAINING_COLOR = "#e5e7eb"; // gray-200
 
 interface Slice {
@@ -36,6 +32,7 @@ interface Slice {
   value: number;
   percentage: number;
   color: string;
+  projectId: number | null;
 }
 
 function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
@@ -64,6 +61,14 @@ function describeArc(cx: number, cy: number, r: number, startAngle: number, endA
 }
 
 export function ScheduleCapacityChart({ projects, assignments, totalSlots }: ScheduleCapacityChartProps) {
+  const projectMap = useMemo(() => {
+    const map = new Map<number, Project>();
+    for (const p of projects) {
+      map.set(p.id, p);
+    }
+    return map;
+  }, [projects]);
+
   const slices = useMemo(() => {
     if (totalSlots === 0) return [];
 
@@ -74,17 +79,18 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
     }
 
     const result: Slice[] = [];
-    projects.forEach((p, i) => {
+    for (const p of projects) {
       const count = counts.get(p.id) || 0;
       if (count > 0) {
         result.push({
           label: p.name,
           value: count,
           percentage: Math.round((count / totalSlots) * 100),
-          color: CHART_COLORS[i % CHART_COLORS.length],
+          color: getProjectColor(p.color).hex,
+          projectId: p.id,
         });
       }
-    });
+    }
 
     const assigned = assignments.length;
     const remaining = totalSlots - assigned;
@@ -94,6 +100,7 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
         value: remaining,
         percentage: Math.round((remaining / totalSlots) * 100),
         color: REMAINING_COLOR,
+        projectId: null,
       });
     }
 
@@ -123,17 +130,33 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
         ))}
       </svg>
       <div className="flex flex-col gap-1.5 py-1">
-        {slices.map((s, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm">
-            <span
-              className="inline-block w-3 h-3 rounded-sm shrink-0"
-              style={{ backgroundColor: s.color }}
-            />
-            <span>
-              {s.label}: <span className="font-medium">{s.percentage}%</span>
-            </span>
-          </div>
-        ))}
+        {slices.map((s, i) => {
+          const project = s.projectId != null ? projectMap.get(s.projectId) : null;
+
+          return (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-block w-3 h-3 rounded-sm shrink-0"
+                style={{ backgroundColor: s.color }}
+              />
+              <span>
+                {project ? (
+                  <EditProjectDialog
+                    project={project}
+                    trigger={
+                      <button className="hover:underline cursor-pointer text-left">
+                        {s.label}
+                      </button>
+                    }
+                  />
+                ) : (
+                  s.label
+                )}{" "}
+                ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
