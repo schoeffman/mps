@@ -44,7 +44,7 @@ export default function Login() {
           <button
             type="button"
             onClick={() =>
-              signIn.social({ provider: "google", callbackURL: "http://localhost:5173/" })
+              signIn.social({ provider: "google", callbackURL: window.location.origin + "/" })
             }
             className="flex w-full items-center justify-center gap-3 rounded-md border bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
           >
@@ -55,7 +55,7 @@ export default function Login() {
           <button
             type="button"
             onClick={() =>
-              signIn.social({ provider: "apple", callbackURL: "http://localhost:5173/" })
+              signIn.social({ provider: "apple", callbackURL: window.location.origin + "/" })
             }
             className="flex w-full items-center justify-center gap-3 rounded-md border bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
           >

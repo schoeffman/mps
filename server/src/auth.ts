@@ -4,7 +4,7 @@ import { db } from "./db/index.js";
 import * as schema from "./db/schema.js";
 
 export const auth = betterAuth({
-  baseURL: "http://localhost:4000",
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:4000",
   database: drizzleAdapter(db, {
     provider: "sqlite",
     schema: {
@@ -24,5 +24,7 @@ export const auth = betterAuth({
       clientSecret: process.env.APPLE_CLIENT_SECRET!,
     },
   },
-  trustedOrigins: ["http://localhost:5173"],
+  trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim()),
 });

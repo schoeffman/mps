@@ -1,4 +1,6 @@
 import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ApolloServer } from "@apollo/server";
 import { expressMiddleware } from "@apollo/server/express4";
 import cors from "cors";
@@ -6,6 +8,10 @@ import express from "express";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { typeDefs, resolvers, type Context } from "./schema.js";
 import { auth } from "./auth.js";
+
+const PORT = Number(process.env.PORT) || 4000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+const isProd = process.env.NODE_ENV === "production";
 
 const app = express();
 
@@ -17,7 +23,7 @@ await server.start();
 
 app.use(
   "/graphql",
-  cors({ origin: "http://localhost:5173", credentials: true }),
+  cors({ origin: CORS_ORIGIN, credentials: true }),
   express.json(),
   expressMiddleware(server, {
     context: async ({ req }) => {
@@ -29,6 +35,19 @@ app.use(
   }),
 );
 
-app.listen(4000, () => {
-  console.log("Server running at http://localhost:4000/graphql");
+// In production, serve the built Vite SPA
+if (isProd) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const clientDist = path.resolve(__dirname, "../../client/dist");
+
+  app.use(express.static(clientDist));
+
+  // Catch-all: return index.html for client-side routing
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}/graphql`);
 });
