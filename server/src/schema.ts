@@ -1,7 +1,36 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, and } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, authUser } from "./db/schema.js";
+
+export interface Context {
+  session: {
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      emailVerified: boolean;
+      image?: string | null | undefined;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    session: {
+      id: string;
+      token: string;
+      expiresAt: Date;
+      userId: string;
+      ipAddress?: string | null | undefined;
+      userAgent?: string | null | undefined;
+    };
+  } | null;
+}
+
+function requireAuth(context: Context) {
+  if (!context.session) {
+    throw new Error("Not authenticated");
+  }
+  return context.session;
+}
 
 export const typeDefs = gql`
   enum CraftAbility {
@@ -134,6 +163,17 @@ export const typeDefs = gql`
     weekStart: String!
   }
 
+  type AuthUser {
+    id: String!
+    name: String!
+    email: String!
+    image: String
+  }
+
+  type SessionInfo {
+    user: AuthUser!
+  }
+
   type Query {
     hello: String
     users: [User!]!
@@ -145,6 +185,8 @@ export const typeDefs = gql`
     schedules: [Schedule!]!
     schedule(id: Int!): Schedule
     scheduleAssignments(scheduleId: Int!, startDate: String!, endDate: String!): [ScheduleAssignment!]!
+    me: SessionInfo
+    authUsers: [AuthUser!]!
   }
 
   input BulkAssignmentInput {
@@ -168,6 +210,7 @@ export const typeDefs = gql`
     deleteSchedule(id: Int!): Boolean!
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
+    linkAuthUser(appUserId: Int!): Boolean!
   }
 `;
 
@@ -321,12 +364,34 @@ export const resolvers = {
         .all();
       return rows.map(mapScheduleAssignmentFromDb);
     },
+    me: (_: unknown, __: unknown, context: Context) => {
+      if (!context.session) return null;
+      return {
+        user: {
+          id: context.session.user.id,
+          name: context.session.user.name,
+          email: context.session.user.email,
+          image: context.session.user.image,
+        },
+      };
+    },
+    authUsers: () => {
+      const rows = db.select().from(authUser).all();
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        image: r.image,
+      }));
+    },
   },
   Mutation: {
     createUser: (
       _: unknown,
       { input }: { input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const row = db
         .insert(users)
         .values({
@@ -342,7 +407,9 @@ export const resolvers = {
     updateUser: (
       _: unknown,
       { id, input }: { id: number; input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const row = db
         .update(users)
         .set({
@@ -356,7 +423,8 @@ export const resolvers = {
         .get();
       return mapUserFromDb(row);
     },
-    deleteUser: (_: unknown, { id }: { id: number }) => {
+    deleteUser: (_: unknown, { id }: { id: number }, context: Context) => {
+      requireAuth(context);
       // Check if user is a team lead
       const teamLead = db.select().from(teams).where(eq(teams.teamLeadId, id)).get();
       if (teamLead) {
@@ -382,7 +450,9 @@ export const resolvers = {
     createTeam: (
       _: unknown,
       { input }: { input: { name: string; teamLeadId: number; memberIds: number[] } },
+      context: Context,
     ) => {
+      requireAuth(context);
       // Ensure lead is included in members
       const allMemberIds = input.memberIds.includes(input.teamLeadId)
         ? input.memberIds
@@ -403,7 +473,9 @@ export const resolvers = {
     updateTeam: (
       _: unknown,
       { id, input }: { id: number; input: { name: string; teamLeadId: number; memberIds: number[] } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const allMemberIds = input.memberIds.includes(input.teamLeadId)
         ? input.memberIds
         : [...input.memberIds, input.teamLeadId];
@@ -423,14 +495,17 @@ export const resolvers = {
 
       return mapTeamFromDb(teamRow);
     },
-    deleteTeam: (_: unknown, { id }: { id: number }) => {
+    deleteTeam: (_: unknown, { id }: { id: number }, context: Context) => {
+      requireAuth(context);
       const result = db.delete(teams).where(eq(teams.id, id)).run();
       return result.changes > 0;
     },
     createProject: (
       _: unknown,
       { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
+      context: Context,
     ) => {
+      requireAuth(context);
       // Ensure DRI is included in members
       const allMemberIds = input.memberIds.includes(input.driId)
         ? input.memberIds
@@ -457,7 +532,9 @@ export const resolvers = {
     updateProject: (
       _: unknown,
       { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const allMemberIds = input.memberIds.includes(input.driId)
         ? input.memberIds
         : [...input.memberIds, input.driId];
@@ -483,14 +560,17 @@ export const resolvers = {
 
       return mapProjectFromDb(projectRow);
     },
-    deleteProject: (_: unknown, { id }: { id: number }) => {
+    deleteProject: (_: unknown, { id }: { id: number }, context: Context) => {
+      requireAuth(context);
       const result = db.delete(projects).where(eq(projects.id, id)).run();
       return result.changes > 0;
     },
     createSchedule: (
       _: unknown,
       { input }: { input: { name: string; year: number; quarter: number } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const row = db
         .insert(schedules)
         .values({ name: input.name, year: input.year, quarter: input.quarter })
@@ -501,7 +581,9 @@ export const resolvers = {
     updateSchedule: (
       _: unknown,
       { id, input }: { id: number; input: { name: string; year: number; quarter: number } },
+      context: Context,
     ) => {
+      requireAuth(context);
       const row = db
         .update(schedules)
         .set({ name: input.name, year: input.year, quarter: input.quarter })
@@ -510,14 +592,17 @@ export const resolvers = {
         .get();
       return mapScheduleFromDb(row);
     },
-    deleteSchedule: (_: unknown, { id }: { id: number }) => {
+    deleteSchedule: (_: unknown, { id }: { id: number }, context: Context) => {
+      requireAuth(context);
       const result = db.delete(schedules).where(eq(schedules.id, id)).run();
       return result.changes > 0;
     },
     setScheduleAssignment: (
       _: unknown,
       { scheduleId, userId, weekStart, projectId }: { scheduleId: number; userId: number; weekStart: string; projectId: number | null },
+      context: Context,
     ) => {
+      requireAuth(context);
       if (projectId == null) {
         db.delete(scheduleAssignments)
           .where(and(
@@ -560,7 +645,9 @@ export const resolvers = {
     bulkSetScheduleAssignments: (
       _: unknown,
       { scheduleId, assignments }: { scheduleId: number; assignments: { userId: number; weekStart: string; projectId: number | null }[] },
+      context: Context,
     ) => {
+      requireAuth(context);
       for (const { userId, weekStart, projectId } of assignments) {
         if (projectId == null) {
           db.delete(scheduleAssignments)
@@ -594,6 +681,19 @@ export const resolvers = {
         }
       }
       return true;
+    },
+    linkAuthUser: (
+      _: unknown,
+      { appUserId }: { appUserId: number },
+      context: Context,
+    ) => {
+      const session = requireAuth(context);
+      const result = db
+        .update(users)
+        .set({ authUserId: session.user.id })
+        .where(eq(users.id, appUserId))
+        .run();
+      return result.changes > 0;
     },
   },
 };

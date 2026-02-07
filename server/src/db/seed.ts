@@ -1,5 +1,5 @@
 import { db } from "./index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, account, session, verification, authUser } from "./schema.js";
 
 const seedUsers = [
   { fullName: "Alice Chen", craftAbility: "Engineering", jobLevel: "Senior", craftFocus: "Frontend" },
@@ -20,6 +20,9 @@ const seedUsers = [
 ];
 
 // Clear existing data (FK-safe order)
+db.delete(account).run();
+db.delete(session).run();
+db.delete(verification).run();
 db.delete(scheduleAssignments).run();
 db.delete(schedules).run();
 db.delete(projectMembers).run();
@@ -27,6 +30,7 @@ db.delete(projects).run();
 db.delete(teamMembers).run();
 db.delete(teams).run();
 db.delete(users).run();
+db.delete(authUser).run();
 
 // Insert users
 const insertedUsers = db.insert(users).values(seedUsers).returning().all();

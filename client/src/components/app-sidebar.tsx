@@ -1,6 +1,7 @@
-import { NavLink } from "react-router-dom";
-import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
+import { useSession, signOut } from "@/lib/auth-client";
 import {
   Sidebar,
   SidebarHeader,
@@ -16,6 +17,10 @@ import {
 
 export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
+  const { data: session } = useSession();
+  const navigate = useNavigate();
+
+  const user = session?.user;
 
   return (
     <Sidebar>
@@ -83,8 +88,31 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2">
-          <div className="size-8 rounded-full bg-muted" />
-          <span className="text-sm">User Name</span>
+          {user?.image ? (
+            <img
+              src={user.image}
+              alt=""
+              className="size-8 rounded-full"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="size-8 rounded-full bg-muted" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-sm font-medium">{user?.name ?? "User"}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email ?? ""}</p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut();
+              navigate("/login");
+            }}
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="size-4" />
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

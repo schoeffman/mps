@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
+import { ProtectedRoute } from "./components/protected-route";
+import Login from "./routes/login";
 import Root from "./routes/root";
 import Home from "./routes/home";
 import Users from "./routes/users";
@@ -17,22 +19,29 @@ import "./index.css";
 const apolloClient = new ApolloClient({
   uri: "/graphql",
   cache: new InMemoryCache(),
+  credentials: "include",
 });
 
 const router = createBrowserRouter([
+  { path: "/login", element: <Login /> },
   {
-    path: "/",
-    element: <Root />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <Home /> },
-      { path: "users", element: <Users /> },
-      { path: "users/:id", element: <UserDetail /> },
-      { path: "teams", element: <Teams /> },
-      { path: "teams/:id", element: <TeamDetail /> },
-      { path: "projects", element: <Projects /> },
-      { path: "projects/:id", element: <ProjectDetail /> },
-      { path: "schedules", element: <Schedules /> },
-      { path: "schedules/:id", element: <ScheduleDetail /> },
+      {
+        path: "/",
+        element: <Root />,
+        children: [
+          { index: true, element: <Home /> },
+          { path: "users", element: <Users /> },
+          { path: "users/:id", element: <UserDetail /> },
+          { path: "teams", element: <Teams /> },
+          { path: "teams/:id", element: <TeamDetail /> },
+          { path: "projects", element: <Projects /> },
+          { path: "projects/:id", element: <ProjectDetail /> },
+          { path: "schedules", element: <Schedules /> },
+          { path: "schedules/:id", element: <ScheduleDetail /> },
+        ],
+      },
     ],
   },
 ]);
