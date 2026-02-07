@@ -1,6 +1,6 @@
 # MPS
 
-MPS is a project scheduler for managing team capacity across quarterly schedules. It shows who is working on what each week in an interactive grid view.
+MPS Project Scheduler is a project scheduler for managing team capacity across quarterly schedules. It shows who is working on what each week in an interactive grid view.
 
 ## Prerequisites
 
