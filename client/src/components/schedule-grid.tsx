@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { gql, useMutation } from "@apollo/client";
-import { formatWeekHeader } from "@/lib/schedule-utils";
+import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { Flag } from "lucide-react";
 import { getProjectColor } from "@/lib/project-colors";
 import { Badge } from "@/components/ui/badge";
 import { ScheduleCell } from "./schedule-cell";
@@ -220,16 +222,31 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
       <div className="overflow-auto border rounded-lg relative isolate">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr>
-              <th className="sticky left-0 z-20 bg-muted px-3 py-2 text-left font-medium min-w-[180px] border-b border-r">
-                Team / Member
-              </th>
-              {weekStarts.map((ws) => (
-                <th key={ws} className="sticky top-0 z-10 bg-muted px-2 py-2 text-center font-medium min-w-[130px] border-b border-r">
-                  {formatWeekHeader(ws)}
+            <TooltipProvider>
+              <tr>
+                <th className="sticky left-0 z-20 bg-muted px-3 py-2 text-left font-medium min-w-[180px] border-b border-r">
+                  Team / Member
                 </th>
-              ))}
-            </tr>
+                {weekStarts.map((ws) => {
+                  const holidays = getHolidaysInWeek(ws);
+                  return (
+                    <th key={ws} className="sticky top-0 z-10 bg-muted px-2 py-2 text-center font-medium min-w-[130px] border-b border-r">
+                      {formatWeekHeader(ws)}
+                      {holidays.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Flag className="inline-block ml-1 h-3 w-3 text-muted-foreground align-text-top" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {holidays.join(", ")}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </TooltipProvider>
           </thead>
           <tbody>
             {teams.map((team) => (
