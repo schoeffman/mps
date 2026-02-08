@@ -61,6 +61,7 @@ export const users = pgTable("users", {
   jobLevel: text("job_level").notNull(),
   craftFocus: text("craft_focus").notNull().default("Not Applicable"),
   authUserId: text("auth_user_id").references(() => authUser.id),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -70,6 +71,7 @@ export const teams = pgTable("teams", {
   teamLeadId: integer("team_lead_id")
     .notNull()
     .references(() => users.id),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -92,6 +94,7 @@ export const projects = pgTable("projects", {
     .references(() => users.id),
   status: text("status").notNull().default("Explore"),
   color: text("color").notNull().default("blue"),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -110,6 +113,7 @@ export const schedules = pgTable("schedules", {
   name: text("name").notNull(),
   year: integer("year").notNull(),
   quarter: integer("quarter").notNull(),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

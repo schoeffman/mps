@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, and } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, authUser } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./db/schema.js";
 
 export interface Context {
   session: {
@@ -30,6 +30,11 @@ function requireAuth(context: Context) {
     throw new Error("Not authenticated");
   }
   return context.session;
+}
+
+function getOwnerId(context: Context): string {
+  const session = requireAuth(context);
+  return session.user.id;
 }
 
 export const typeDefs = gql`
@@ -186,7 +191,6 @@ export const typeDefs = gql`
     schedule(id: Int!): Schedule
     scheduleAssignments(scheduleId: Int!, startDate: String!, endDate: String!): [ScheduleAssignment!]!
     me: SessionInfo
-    authUsers: [AuthUser!]!
   }
 
   input BulkAssignmentInput {
@@ -315,43 +319,56 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
 export const resolvers = {
   Query: {
     hello: () => "Hello world from Apollo Server!",
-    users: async () => {
-      const rows = await db.select().from(users);
+    users: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db.select().from(users).where(eq(users.ownerId, ownerId));
       return rows.map(mapUserFromDb);
     },
-    user: async (_: unknown, { id }: { id: number }) => {
-      const [row] = await db.select().from(users).where(eq(users.id, id));
+    user: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(users).where(and(eq(users.id, id), eq(users.ownerId, ownerId)));
       if (!row) return null;
       return mapUserFromDb(row);
     },
-    teams: async () => {
-      const rows = await db.select().from(teams);
+    teams: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db.select().from(teams).where(eq(teams.ownerId, ownerId));
       return Promise.all(rows.map(mapTeamFromDb));
     },
-    team: async (_: unknown, { id }: { id: number }) => {
-      const [row] = await db.select().from(teams).where(eq(teams.id, id));
+    team: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(teams).where(and(eq(teams.id, id), eq(teams.ownerId, ownerId)));
       if (!row) return null;
       return mapTeamFromDb(row);
     },
-    projects: async () => {
-      const rows = await db.select().from(projects);
+    projects: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db.select().from(projects).where(eq(projects.ownerId, ownerId));
       return Promise.all(rows.map(mapProjectFromDb));
     },
-    project: async (_: unknown, { id }: { id: number }) => {
-      const [row] = await db.select().from(projects).where(eq(projects.id, id));
+    project: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)));
       if (!row) return null;
       return mapProjectFromDb(row);
     },
-    schedules: async () => {
-      const rows = await db.select().from(schedules);
+    schedules: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db.select().from(schedules).where(eq(schedules.ownerId, ownerId));
       return rows.map(mapScheduleFromDb);
     },
-    schedule: async (_: unknown, { id }: { id: number }) => {
-      const [row] = await db.select().from(schedules).where(eq(schedules.id, id));
+    schedule: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(schedules).where(and(eq(schedules.id, id), eq(schedules.ownerId, ownerId)));
       if (!row) return null;
       return mapScheduleFromDb(row);
     },
-    scheduleAssignments: async (_: unknown, { scheduleId, startDate, endDate }: { scheduleId: number; startDate: string; endDate: string }) => {
+    scheduleAssignments: async (_: unknown, { scheduleId, startDate, endDate }: { scheduleId: number; startDate: string; endDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      // Verify schedule ownership
+      const [schedule] = await db.select().from(schedules).where(and(eq(schedules.id, scheduleId), eq(schedules.ownerId, ownerId)));
+      if (!schedule) throw new Error("Schedule not found");
+
       const rows = await db
         .select()
         .from(scheduleAssignments)
@@ -373,15 +390,6 @@ export const resolvers = {
         },
       };
     },
-    authUsers: async () => {
-      const rows = await db.select().from(authUser);
-      return rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        email: r.email,
-        image: r.image,
-      }));
-    },
   },
   Mutation: {
     createUser: async (
@@ -389,7 +397,7 @@ export const resolvers = {
       { input }: { input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const [row] = await db
         .insert(users)
         .values({
@@ -397,6 +405,7 @@ export const resolvers = {
           craftAbility: craftAbilityToDb[input.craftAbility] ?? input.craftAbility,
           jobLevel: input.jobLevel,
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
+          ownerId,
         })
         .returning();
       return mapUserFromDb(row);
@@ -406,7 +415,7 @@ export const resolvers = {
       { id, input }: { id: number; input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const [row] = await db
         .update(users)
         .set({
@@ -415,20 +424,21 @@ export const resolvers = {
           jobLevel: input.jobLevel,
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
         })
-        .where(eq(users.id, id))
+        .where(and(eq(users.id, id), eq(users.ownerId, ownerId)))
         .returning();
+      if (!row) throw new Error("User not found");
       return mapUserFromDb(row);
     },
     deleteUser: async (_: unknown, { id }: { id: number }, context: Context) => {
-      requireAuth(context);
-      // Check if user is a team lead
-      const [teamLead] = await db.select().from(teams).where(eq(teams.teamLeadId, id));
+      const ownerId = getOwnerId(context);
+      // Check if user is a team lead (only within owner's teams)
+      const [teamLead] = await db.select().from(teams).where(and(eq(teams.teamLeadId, id), eq(teams.ownerId, ownerId)));
       if (teamLead) {
         throw new Error(`Cannot delete user: they are the lead of team "${teamLead.name}"`);
       }
 
-      // Check if user is a project DRI
-      const [projectDri] = await db.select().from(projects).where(eq(projects.driId, id));
+      // Check if user is a project DRI (only within owner's projects)
+      const [projectDri] = await db.select().from(projects).where(and(eq(projects.driId, id), eq(projects.ownerId, ownerId)));
       if (projectDri) {
         throw new Error(`Cannot delete user: they are the DRI of project "${projectDri.name}"`);
       }
@@ -439,8 +449,8 @@ export const resolvers = {
       // Remove from project memberships
       await db.delete(projectMembers).where(eq(projectMembers.userId, id));
 
-      // Delete the user
-      const deleted = await db.delete(users).where(eq(users.id, id)).returning();
+      // Delete the user (scoped by owner)
+      const deleted = await db.delete(users).where(and(eq(users.id, id), eq(users.ownerId, ownerId))).returning();
       return deleted.length > 0;
     },
     createTeam: async (
@@ -448,7 +458,7 @@ export const resolvers = {
       { input }: { input: { name: string; teamLeadId: number; memberIds: number[] } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       // Ensure lead is included in members
       const allMemberIds = input.memberIds.includes(input.teamLeadId)
         ? input.memberIds
@@ -456,7 +466,7 @@ export const resolvers = {
 
       const [teamRow] = await db
         .insert(teams)
-        .values({ name: input.name, teamLeadId: input.teamLeadId })
+        .values({ name: input.name, teamLeadId: input.teamLeadId, ownerId })
         .returning();
 
       await db.insert(teamMembers)
@@ -469,7 +479,7 @@ export const resolvers = {
       { id, input }: { id: number; input: { name: string; teamLeadId: number; memberIds: number[] } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const allMemberIds = input.memberIds.includes(input.teamLeadId)
         ? input.memberIds
         : [...input.memberIds, input.teamLeadId];
@@ -477,8 +487,9 @@ export const resolvers = {
       const [teamRow] = await db
         .update(teams)
         .set({ name: input.name, teamLeadId: input.teamLeadId })
-        .where(eq(teams.id, id))
+        .where(and(eq(teams.id, id), eq(teams.ownerId, ownerId)))
         .returning();
+      if (!teamRow) throw new Error("Team not found");
 
       // Replace all memberships
       await db.delete(teamMembers).where(eq(teamMembers.teamId, id));
@@ -488,8 +499,8 @@ export const resolvers = {
       return mapTeamFromDb(teamRow);
     },
     deleteTeam: async (_: unknown, { id }: { id: number }, context: Context) => {
-      requireAuth(context);
-      const deleted = await db.delete(teams).where(eq(teams.id, id)).returning();
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(teams).where(and(eq(teams.id, id), eq(teams.ownerId, ownerId))).returning();
       return deleted.length > 0;
     },
     createProject: async (
@@ -497,7 +508,7 @@ export const resolvers = {
       { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       // Ensure DRI is included in members
       const allMemberIds = input.memberIds.includes(input.driId)
         ? input.memberIds
@@ -511,6 +522,7 @@ export const resolvers = {
           driId: input.driId,
           status: input.status,
           color: input.color,
+          ownerId,
         })
         .returning();
 
@@ -524,7 +536,7 @@ export const resolvers = {
       { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const allMemberIds = input.memberIds.includes(input.driId)
         ? input.memberIds
         : [...input.memberIds, input.driId];
@@ -538,8 +550,9 @@ export const resolvers = {
           status: input.status,
           color: input.color,
         })
-        .where(eq(projects.id, id))
+        .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
         .returning();
+      if (!projectRow) throw new Error("Project not found");
 
       // Replace all memberships
       await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
@@ -549,8 +562,8 @@ export const resolvers = {
       return mapProjectFromDb(projectRow);
     },
     deleteProject: async (_: unknown, { id }: { id: number }, context: Context) => {
-      requireAuth(context);
-      const deleted = await db.delete(projects).where(eq(projects.id, id)).returning();
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(projects).where(and(eq(projects.id, id), eq(projects.ownerId, ownerId))).returning();
       return deleted.length > 0;
     },
     createSchedule: async (
@@ -558,10 +571,10 @@ export const resolvers = {
       { input }: { input: { name: string; year: number; quarter: number } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const [row] = await db
         .insert(schedules)
-        .values({ name: input.name, year: input.year, quarter: input.quarter })
+        .values({ name: input.name, year: input.year, quarter: input.quarter, ownerId })
         .returning();
       return mapScheduleFromDb(row);
     },
@@ -570,17 +583,18 @@ export const resolvers = {
       { id, input }: { id: number; input: { name: string; year: number; quarter: number } },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
       const [row] = await db
         .update(schedules)
         .set({ name: input.name, year: input.year, quarter: input.quarter })
-        .where(eq(schedules.id, id))
+        .where(and(eq(schedules.id, id), eq(schedules.ownerId, ownerId)))
         .returning();
+      if (!row) throw new Error("Schedule not found");
       return mapScheduleFromDb(row);
     },
     deleteSchedule: async (_: unknown, { id }: { id: number }, context: Context) => {
-      requireAuth(context);
-      const deleted = await db.delete(schedules).where(eq(schedules.id, id)).returning();
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.ownerId, ownerId))).returning();
       return deleted.length > 0;
     },
     setScheduleAssignment: async (
@@ -588,7 +602,11 @@ export const resolvers = {
       { scheduleId, userId, weekStart, projectId }: { scheduleId: number; userId: number; weekStart: string; projectId: number | null },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
+      // Verify schedule ownership
+      const [schedule] = await db.select().from(schedules).where(and(eq(schedules.id, scheduleId), eq(schedules.ownerId, ownerId)));
+      if (!schedule) throw new Error("Schedule not found");
+
       if (projectId == null) {
         await db.delete(scheduleAssignments)
           .where(and(
@@ -629,7 +647,11 @@ export const resolvers = {
       { scheduleId, assignments }: { scheduleId: number; assignments: { userId: number; weekStart: string; projectId: number | null }[] },
       context: Context,
     ) => {
-      requireAuth(context);
+      const ownerId = getOwnerId(context);
+      // Verify schedule ownership
+      const [schedule] = await db.select().from(schedules).where(and(eq(schedules.id, scheduleId), eq(schedules.ownerId, ownerId)));
+      if (!schedule) throw new Error("Schedule not found");
+
       for (const { userId, weekStart, projectId } of assignments) {
         if (projectId == null) {
           await db.delete(scheduleAssignments)
@@ -665,11 +687,11 @@ export const resolvers = {
       { appUserId }: { appUserId: number },
       context: Context,
     ) => {
-      const session = requireAuth(context);
+      const ownerId = getOwnerId(context);
       const updated = await db
         .update(users)
-        .set({ authUserId: session.user.id })
-        .where(eq(users.id, appUserId))
+        .set({ authUserId: ownerId })
+        .where(and(eq(users.id, appUserId), eq(users.ownerId, ownerId)))
         .returning();
       return updated.length > 0;
     },

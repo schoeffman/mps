@@ -1,6 +1,8 @@
 import { db, pool } from "./index.js";
 import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, account, session, verification, authUser } from "./schema.js";
 
+const OWNER_ID = process.env.OWNER_ID;
+
 const seedUsers = [
   { fullName: "Alice Chen", craftAbility: "Engineering", jobLevel: "Senior", craftFocus: "Frontend" },
   { fullName: "Bob Martinez", craftAbility: "Engineering", jobLevel: "Staff", craftFocus: "Backend" },
@@ -21,9 +23,6 @@ const seedUsers = [
 
 async function seed() {
   // Clear existing data (FK-safe order)
-  await db.delete(account);
-  await db.delete(session);
-  await db.delete(verification);
   await db.delete(scheduleAssignments);
   await db.delete(schedules);
   await db.delete(projectMembers);
@@ -31,10 +30,22 @@ async function seed() {
   await db.delete(teamMembers);
   await db.delete(teams);
   await db.delete(users);
-  await db.delete(authUser);
+
+  console.log("Cleared app data.");
+
+  if (!OWNER_ID) {
+    console.log("No OWNER_ID env var set — skipping app data seeding.");
+    console.log("To seed: OWNER_ID=<auth-user-id> npm run db:seed");
+    await pool.end();
+    return;
+  }
+
+  console.log(`Seeding app data for owner: ${OWNER_ID}`);
 
   // Insert users
-  const insertedUsers = await db.insert(users).values(seedUsers).returning();
+  const insertedUsers = await db.insert(users).values(
+    seedUsers.map((u) => ({ ...u, ownerId: OWNER_ID })),
+  ).returning();
   console.log(`Seeded ${insertedUsers.length} users.`);
 
   // Build a lookup by name
@@ -54,6 +65,7 @@ async function seed() {
       seedTeams.map((t) => ({
         name: t.name,
         teamLeadId: userByName[t.leadName].id,
+        ownerId: OWNER_ID,
       })),
     )
     .returning();
@@ -103,6 +115,7 @@ async function seed() {
         driId: userByName[p.driName].id,
         status: p.status,
         color: p.color,
+        ownerId: OWNER_ID,
       })),
     )
     .returning();
@@ -139,7 +152,7 @@ async function seed() {
   // Seed schedule
   const [insertedSchedule] = await db
     .insert(schedules)
-    .values({ name: "Q1 2026 Plan", year: 2026, quarter: 1 })
+    .values({ name: "Q1 2026 Plan", year: 2026, quarter: 1, ownerId: OWNER_ID })
     .returning();
   console.log(`Seeded schedule: ${insertedSchedule.name}`);
 
