@@ -24,6 +24,8 @@ interface ScheduleCellProps {
   activeProjectId: number | null | "eraser";
   onPaintStart?: (userId: number, weekStart: string) => void;
   onPaintEnter?: (userId: number, weekStart: string) => void;
+  isPainted?: boolean;
+  paintPreviewBg?: string;
 }
 
 export function ScheduleCell({
@@ -37,6 +39,8 @@ export function ScheduleCell({
   activeProjectId,
   onPaintStart,
   onPaintEnter,
+  isPainted,
+  paintPreviewBg,
 }: ScheduleCellProps) {
   const handleChange = (value: string) => {
     if (value === NONE_VALUE) {
@@ -47,13 +51,18 @@ export function ScheduleCell({
   };
 
   if (isPaintMode) {
-    const projectName = projectId
-      ? projects.find((p) => p.id === projectId)?.name ?? "—"
+    const isErasing = isPainted && activeProjectId === "eraser";
+    const previewProjectId = isPainted
+      ? (activeProjectId === "eraser" ? null : activeProjectId)
+      : projectId;
+    const displayBg = isPainted ? (paintPreviewBg ?? "") : bgColor;
+    const projectName = previewProjectId
+      ? projects.find((p) => p.id === previewProjectId)?.name ?? "—"
       : "—";
 
     return (
       <td
-        className={`border-r p-0.5 cursor-pointer select-none hover:ring-2 hover:ring-inset hover:ring-primary/50 ${bgColor}`}
+        className={`border-r p-0.5 cursor-pointer select-none hover:ring-2 hover:ring-inset hover:ring-primary/50 ${displayBg} ${isPainted && !isErasing ? "ring-2 ring-inset ring-primary/40" : ""}`}
         onMouseDown={(e) => {
           e.preventDefault();
           onPaintStart?.(userId, weekStart);

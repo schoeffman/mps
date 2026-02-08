@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { gql, useMutation } from "@apollo/client";
 import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -68,9 +68,16 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
   // Paint mode state
   const [activeProjectId, setActiveProjectId] = useState<number | null | "eraser">(null);
   const [isPainting, setIsPainting] = useState(false);
-  const paintedCellsRef = useRef<Set<string>>(new Set());
+  const [paintedCells, setPaintedCells] = useState<Set<string>>(new Set());
 
   const isPaintMode = activeProjectId !== null;
+
+  // Preview color for cells being painted
+  const paintPreviewBg = useMemo(() => {
+    if (activeProjectId === null || activeProjectId === "eraser") return "";
+    const project = projects.find((p) => p.id === activeProjectId);
+    return project ? getProjectColor(project.color).cellBg : "";
+  }, [activeProjectId, projects]);
 
   // O(1) lookup: "userId-weekStart" → projectId
   const assignmentMap = useMemo(() => {
@@ -122,41 +129,46 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     bulkSetAssignments({ variables: { scheduleId, assignments: assignmentInputs } });
   };
 
-  const applyPaint = useCallback((userId: number, weekStart: string) => {
-    const key = `${userId}-${weekStart}`;
-    paintedCellsRef.current.add(key);
-  }, []);
-
   const handlePaintStart = useCallback((userId: number, weekStart: string) => {
     setIsPainting(true);
-    paintedCellsRef.current = new Set();
-    applyPaint(userId, weekStart);
-  }, [applyPaint]);
+    setPaintedCells((prev) => {
+      const next = new Set(prev);
+      next.add(`${userId}-${weekStart}`);
+      return next;
+    });
+  }, []);
 
   const handlePaintEnter = useCallback((userId: number, weekStart: string) => {
     if (!isPainting) return;
-    applyPaint(userId, weekStart);
-  }, [isPainting, applyPaint]);
+    setPaintedCells((prev) => {
+      const next = new Set(prev);
+      next.add(`${userId}-${weekStart}`);
+      return next;
+    });
+  }, [isPainting]);
 
+  // Mouseup just stops the drag — does NOT commit
   const handlePaintEnd = useCallback(() => {
     if (!isPainting) return;
     setIsPainting(false);
+  }, [isPainting]);
 
-    const cells = paintedCellsRef.current;
-    if (cells.size === 0) return;
+  // Save: commit all painted cells via mutation, then exit paint mode
+  const handleSave = useCallback(() => {
+    if (paintedCells.size > 0) {
+      const projectIdValue = activeProjectId === "eraser" ? null : activeProjectId;
+      const assignmentInputs = Array.from(paintedCells).map((key) => {
+        const [userIdStr, ...weekParts] = key.split("-");
+        const weekStart = weekParts.join("-");
+        return { userId: parseInt(userIdStr, 10), weekStart, projectId: projectIdValue };
+      });
+      bulkSetAssignments({ variables: { scheduleId, assignments: assignmentInputs } });
+    }
+    setPaintedCells(new Set());
+    setActiveProjectId(null);
+  }, [paintedCells, activeProjectId, scheduleId, bulkSetAssignments]);
 
-    const projectIdValue = activeProjectId === "eraser" ? null : activeProjectId;
-    const assignmentInputs = Array.from(cells).map((key) => {
-      const [userIdStr, ...weekParts] = key.split("-");
-      const weekStart = weekParts.join("-"); // rejoin since dates have dashes
-      return { userId: parseInt(userIdStr, 10), weekStart, projectId: projectIdValue };
-    });
-
-    bulkSetAssignments({ variables: { scheduleId, assignments: assignmentInputs } });
-    paintedCellsRef.current = new Set();
-  }, [isPainting, activeProjectId, scheduleId, bulkSetAssignments]);
-
-  // Global mouseup listener to end painting
+  // Global mouseup listener to end drag
   useEffect(() => {
     const onMouseUp = () => {
       if (isPainting) handlePaintEnd();
@@ -165,13 +177,13 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     return () => document.removeEventListener("mouseup", onMouseUp);
   }, [isPainting, handlePaintEnd]);
 
-  // Escape key exits paint mode
+  // Escape key cancels paint mode without saving
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setActiveProjectId(null);
         setIsPainting(false);
-        paintedCellsRef.current = new Set();
+        setPaintedCells(new Set());
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -180,8 +192,9 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
 
   const handleChipClick = (id: number | "eraser") => {
     if (activeProjectId === id) {
-      setActiveProjectId(null);
+      handleSave();
     } else {
+      setPaintedCells(new Set());
       setActiveProjectId(id);
     }
   };
@@ -202,7 +215,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                 isActive ? "ring-2 ring-primary ring-offset-1 scale-105" : "opacity-70 hover:opacity-100"
               }`}
             >
-              {p.name}
+              {isActive ? "Save" : p.name}
             </button>
           );
         })}
@@ -215,7 +228,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
           Eraser
         </button>
         {isPaintMode && (
-          <span className="text-xs text-muted-foreground ml-2">(Press Escape to exit)</span>
+          <span className="text-xs text-muted-foreground ml-2">(Press Escape to cancel)</span>
         )}
       </div>
 
@@ -278,7 +291,9 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                       />
                     </td>
                     {weekStarts.map((ws) => {
-                      const projectId = assignmentMap.get(`${member.id}-${ws}`) ?? null;
+                      const cellKey = `${member.id}-${ws}`;
+                      const isPainted = paintedCells.has(cellKey);
+                      const projectId = assignmentMap.get(cellKey) ?? null;
                       const bgColor = projectId ? projectColorMap.get(projectId) ?? "" : "";
                       return (
                         <ScheduleCell
@@ -293,6 +308,8 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                           activeProjectId={activeProjectId}
                           onPaintStart={handlePaintStart}
                           onPaintEnter={handlePaintEnter}
+                          isPainted={isPainted}
+                          paintPreviewBg={paintPreviewBg}
                         />
                       );
                     })}
