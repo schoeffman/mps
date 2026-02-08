@@ -17,13 +17,13 @@
     "drizzle-orm": "^0.45.1",
     "express": "^4.21.0",
     "graphql": "^16.9.0",
-    "graphql-tag": "^2.12.6"
+    "graphql-tag": "^2.12.6",
+    "tsx": "^4.19.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "drizzle-kit": "^0.31.8",
-    "tsx": "^4.19.0"
+    "drizzle-kit": "^0.31.8"
   }
 }
