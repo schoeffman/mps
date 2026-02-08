@@ -5,6 +5,7 @@
     "nixpacksPlan": {
       "phases": {
         "setup": {
+          "nixPkgs": ["nodejs_22"],
           "aptPkgs": ["python3", "make", "g++"]
         }
       }
