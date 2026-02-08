@@ -249,26 +249,26 @@ const craftFocusFromDb: Record<string, string> = {
 function mapUserFromDb(row: typeof users.$inferSelect) {
   return {
     ...row,
+    createdAt: row.createdAt.toISOString(),
     craftAbility: craftAbilityFromDb[row.craftAbility] ?? row.craftAbility,
     craftFocus: craftFocusFromDb[row.craftFocus] ?? row.craftFocus,
   };
 }
 
-function mapTeamFromDb(teamRow: typeof teams.$inferSelect) {
-  const leadRow = db.select().from(users).where(eq(users.id, teamRow.teamLeadId)).get();
-  const memberRows = db
+async function mapTeamFromDb(teamRow: typeof teams.$inferSelect) {
+  const [leadRow] = await db.select().from(users).where(eq(users.id, teamRow.teamLeadId));
+  const memberRows = await db
     .select({ user: users })
     .from(teamMembers)
     .innerJoin(users, eq(teamMembers.userId, users.id))
-    .where(eq(teamMembers.teamId, teamRow.id))
-    .all();
+    .where(eq(teamMembers.teamId, teamRow.id));
 
   return {
     id: teamRow.id,
     name: teamRow.name,
     teamLead: leadRow ? mapUserFromDb(leadRow) : null,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
-    createdAt: teamRow.createdAt,
+    createdAt: teamRow.createdAt.toISOString(),
   };
 }
 
@@ -278,7 +278,7 @@ function mapScheduleFromDb(row: typeof schedules.$inferSelect) {
     name: row.name,
     year: row.year,
     quarter: row.quarter,
-    createdAt: row.createdAt,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -292,14 +292,13 @@ function mapScheduleAssignmentFromDb(row: typeof scheduleAssignments.$inferSelec
   };
 }
 
-function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
-  const driRow = db.select().from(users).where(eq(users.id, projectRow.driId)).get();
-  const memberRows = db
+async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
+  const [driRow] = await db.select().from(users).where(eq(users.id, projectRow.driId));
+  const memberRows = await db
     .select({ user: users })
     .from(projectMembers)
     .innerJoin(users, eq(projectMembers.userId, users.id))
-    .where(eq(projectMembers.projectId, projectRow.id))
-    .all();
+    .where(eq(projectMembers.projectId, projectRow.id));
 
   return {
     id: projectRow.id,
@@ -309,59 +308,58 @@ function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     status: projectRow.status,
     color: projectRow.color,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
-    createdAt: projectRow.createdAt,
+    createdAt: projectRow.createdAt.toISOString(),
   };
 }
 
 export const resolvers = {
   Query: {
     hello: () => "Hello world from Apollo Server!",
-    users: () => {
-      const rows = db.select().from(users).all();
+    users: async () => {
+      const rows = await db.select().from(users);
       return rows.map(mapUserFromDb);
     },
-    user: (_: unknown, { id }: { id: number }) => {
-      const row = db.select().from(users).where(eq(users.id, id)).get();
+    user: async (_: unknown, { id }: { id: number }) => {
+      const [row] = await db.select().from(users).where(eq(users.id, id));
       if (!row) return null;
       return mapUserFromDb(row);
     },
-    teams: () => {
-      const rows = db.select().from(teams).all();
-      return rows.map(mapTeamFromDb);
+    teams: async () => {
+      const rows = await db.select().from(teams);
+      return Promise.all(rows.map(mapTeamFromDb));
     },
-    team: (_: unknown, { id }: { id: number }) => {
-      const row = db.select().from(teams).where(eq(teams.id, id)).get();
+    team: async (_: unknown, { id }: { id: number }) => {
+      const [row] = await db.select().from(teams).where(eq(teams.id, id));
       if (!row) return null;
       return mapTeamFromDb(row);
     },
-    projects: () => {
-      const rows = db.select().from(projects).all();
-      return rows.map(mapProjectFromDb);
+    projects: async () => {
+      const rows = await db.select().from(projects);
+      return Promise.all(rows.map(mapProjectFromDb));
     },
-    project: (_: unknown, { id }: { id: number }) => {
-      const row = db.select().from(projects).where(eq(projects.id, id)).get();
+    project: async (_: unknown, { id }: { id: number }) => {
+      const [row] = await db.select().from(projects).where(eq(projects.id, id));
       if (!row) return null;
       return mapProjectFromDb(row);
     },
-    schedules: () => {
-      const rows = db.select().from(schedules).all();
+    schedules: async () => {
+      const rows = await db.select().from(schedules);
       return rows.map(mapScheduleFromDb);
     },
-    schedule: (_: unknown, { id }: { id: number }) => {
-      const row = db.select().from(schedules).where(eq(schedules.id, id)).get();
+    schedule: async (_: unknown, { id }: { id: number }) => {
+      const [row] = await db.select().from(schedules).where(eq(schedules.id, id));
       if (!row) return null;
       return mapScheduleFromDb(row);
     },
-    scheduleAssignments: (_: unknown, { scheduleId, startDate, endDate }: { scheduleId: number; startDate: string; endDate: string }) => {
-      const rows = db
+    scheduleAssignments: async (_: unknown, { scheduleId, startDate, endDate }: { scheduleId: number; startDate: string; endDate: string }) => {
+      const rows = await db
         .select()
         .from(scheduleAssignments)
         .where(and(
           eq(scheduleAssignments.scheduleId, scheduleId),
           gte(scheduleAssignments.weekStart, startDate),
           lte(scheduleAssignments.weekStart, endDate),
-        ))
-        .all();
+        ));
       return rows.map(mapScheduleAssignmentFromDb);
     },
     me: (_: unknown, __: unknown, context: Context) => {
@@ -375,8 +373,8 @@ export const resolvers = {
         },
       };
     },
-    authUsers: () => {
-      const rows = db.select().from(authUser).all();
+    authUsers: async () => {
+      const rows = await db.select().from(authUser);
       return rows.map((r) => ({
         id: r.id,
         name: r.name,
@@ -386,13 +384,13 @@ export const resolvers = {
     },
   },
   Mutation: {
-    createUser: (
+    createUser: async (
       _: unknown,
       { input }: { input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
       context: Context,
     ) => {
       requireAuth(context);
-      const row = db
+      const [row] = await db
         .insert(users)
         .values({
           fullName: input.fullName,
@@ -400,17 +398,16 @@ export const resolvers = {
           jobLevel: input.jobLevel,
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
         })
-        .returning()
-        .get();
+        .returning();
       return mapUserFromDb(row);
     },
-    updateUser: (
+    updateUser: async (
       _: unknown,
       { id, input }: { id: number; input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
       context: Context,
     ) => {
       requireAuth(context);
-      const row = db
+      const [row] = await db
         .update(users)
         .set({
           fullName: input.fullName,
@@ -419,35 +416,34 @@ export const resolvers = {
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
         })
         .where(eq(users.id, id))
-        .returning()
-        .get();
+        .returning();
       return mapUserFromDb(row);
     },
-    deleteUser: (_: unknown, { id }: { id: number }, context: Context) => {
+    deleteUser: async (_: unknown, { id }: { id: number }, context: Context) => {
       requireAuth(context);
       // Check if user is a team lead
-      const teamLead = db.select().from(teams).where(eq(teams.teamLeadId, id)).get();
+      const [teamLead] = await db.select().from(teams).where(eq(teams.teamLeadId, id));
       if (teamLead) {
         throw new Error(`Cannot delete user: they are the lead of team "${teamLead.name}"`);
       }
 
       // Check if user is a project DRI
-      const projectDri = db.select().from(projects).where(eq(projects.driId, id)).get();
+      const [projectDri] = await db.select().from(projects).where(eq(projects.driId, id));
       if (projectDri) {
         throw new Error(`Cannot delete user: they are the DRI of project "${projectDri.name}"`);
       }
 
       // Remove from team memberships
-      db.delete(teamMembers).where(eq(teamMembers.userId, id)).run();
+      await db.delete(teamMembers).where(eq(teamMembers.userId, id));
 
       // Remove from project memberships
-      db.delete(projectMembers).where(eq(projectMembers.userId, id)).run();
+      await db.delete(projectMembers).where(eq(projectMembers.userId, id));
 
       // Delete the user
-      const result = db.delete(users).where(eq(users.id, id)).run();
-      return result.changes > 0;
+      const deleted = await db.delete(users).where(eq(users.id, id)).returning();
+      return deleted.length > 0;
     },
-    createTeam: (
+    createTeam: async (
       _: unknown,
       { input }: { input: { name: string; teamLeadId: number; memberIds: number[] } },
       context: Context,
@@ -458,19 +454,17 @@ export const resolvers = {
         ? input.memberIds
         : [...input.memberIds, input.teamLeadId];
 
-      const teamRow = db
+      const [teamRow] = await db
         .insert(teams)
         .values({ name: input.name, teamLeadId: input.teamLeadId })
-        .returning()
-        .get();
+        .returning();
 
-      db.insert(teamMembers)
-        .values(allMemberIds.map((userId) => ({ teamId: teamRow.id, userId })))
-        .run();
+      await db.insert(teamMembers)
+        .values(allMemberIds.map((userId) => ({ teamId: teamRow.id, userId })));
 
       return mapTeamFromDb(teamRow);
     },
-    updateTeam: (
+    updateTeam: async (
       _: unknown,
       { id, input }: { id: number; input: { name: string; teamLeadId: number; memberIds: number[] } },
       context: Context,
@@ -480,27 +474,25 @@ export const resolvers = {
         ? input.memberIds
         : [...input.memberIds, input.teamLeadId];
 
-      const teamRow = db
+      const [teamRow] = await db
         .update(teams)
         .set({ name: input.name, teamLeadId: input.teamLeadId })
         .where(eq(teams.id, id))
-        .returning()
-        .get();
+        .returning();
 
       // Replace all memberships
-      db.delete(teamMembers).where(eq(teamMembers.teamId, id)).run();
-      db.insert(teamMembers)
-        .values(allMemberIds.map((userId) => ({ teamId: id, userId })))
-        .run();
+      await db.delete(teamMembers).where(eq(teamMembers.teamId, id));
+      await db.insert(teamMembers)
+        .values(allMemberIds.map((userId) => ({ teamId: id, userId })));
 
       return mapTeamFromDb(teamRow);
     },
-    deleteTeam: (_: unknown, { id }: { id: number }, context: Context) => {
+    deleteTeam: async (_: unknown, { id }: { id: number }, context: Context) => {
       requireAuth(context);
-      const result = db.delete(teams).where(eq(teams.id, id)).run();
-      return result.changes > 0;
+      const deleted = await db.delete(teams).where(eq(teams.id, id)).returning();
+      return deleted.length > 0;
     },
-    createProject: (
+    createProject: async (
       _: unknown,
       { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
       context: Context,
@@ -511,7 +503,7 @@ export const resolvers = {
         ? input.memberIds
         : [...input.memberIds, input.driId];
 
-      const projectRow = db
+      const [projectRow] = await db
         .insert(projects)
         .values({
           name: input.name,
@@ -520,16 +512,14 @@ export const resolvers = {
           status: input.status,
           color: input.color,
         })
-        .returning()
-        .get();
+        .returning();
 
-      db.insert(projectMembers)
-        .values(allMemberIds.map((userId) => ({ projectId: projectRow.id, userId })))
-        .run();
+      await db.insert(projectMembers)
+        .values(allMemberIds.map((userId) => ({ projectId: projectRow.id, userId })));
 
       return mapProjectFromDb(projectRow);
     },
-    updateProject: (
+    updateProject: async (
       _: unknown,
       { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
       context: Context,
@@ -539,7 +529,7 @@ export const resolvers = {
         ? input.memberIds
         : [...input.memberIds, input.driId];
 
-      const projectRow = db
+      const [projectRow] = await db
         .update(projects)
         .set({
           name: input.name,
@@ -549,100 +539,92 @@ export const resolvers = {
           color: input.color,
         })
         .where(eq(projects.id, id))
-        .returning()
-        .get();
+        .returning();
 
       // Replace all memberships
-      db.delete(projectMembers).where(eq(projectMembers.projectId, id)).run();
-      db.insert(projectMembers)
-        .values(allMemberIds.map((userId) => ({ projectId: id, userId })))
-        .run();
+      await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
+      await db.insert(projectMembers)
+        .values(allMemberIds.map((userId) => ({ projectId: id, userId })));
 
       return mapProjectFromDb(projectRow);
     },
-    deleteProject: (_: unknown, { id }: { id: number }, context: Context) => {
+    deleteProject: async (_: unknown, { id }: { id: number }, context: Context) => {
       requireAuth(context);
-      const result = db.delete(projects).where(eq(projects.id, id)).run();
-      return result.changes > 0;
+      const deleted = await db.delete(projects).where(eq(projects.id, id)).returning();
+      return deleted.length > 0;
     },
-    createSchedule: (
+    createSchedule: async (
       _: unknown,
       { input }: { input: { name: string; year: number; quarter: number } },
       context: Context,
     ) => {
       requireAuth(context);
-      const row = db
+      const [row] = await db
         .insert(schedules)
         .values({ name: input.name, year: input.year, quarter: input.quarter })
-        .returning()
-        .get();
+        .returning();
       return mapScheduleFromDb(row);
     },
-    updateSchedule: (
+    updateSchedule: async (
       _: unknown,
       { id, input }: { id: number; input: { name: string; year: number; quarter: number } },
       context: Context,
     ) => {
       requireAuth(context);
-      const row = db
+      const [row] = await db
         .update(schedules)
         .set({ name: input.name, year: input.year, quarter: input.quarter })
         .where(eq(schedules.id, id))
-        .returning()
-        .get();
+        .returning();
       return mapScheduleFromDb(row);
     },
-    deleteSchedule: (_: unknown, { id }: { id: number }, context: Context) => {
+    deleteSchedule: async (_: unknown, { id }: { id: number }, context: Context) => {
       requireAuth(context);
-      const result = db.delete(schedules).where(eq(schedules.id, id)).run();
-      return result.changes > 0;
+      const deleted = await db.delete(schedules).where(eq(schedules.id, id)).returning();
+      return deleted.length > 0;
     },
-    setScheduleAssignment: (
+    setScheduleAssignment: async (
       _: unknown,
       { scheduleId, userId, weekStart, projectId }: { scheduleId: number; userId: number; weekStart: string; projectId: number | null },
       context: Context,
     ) => {
       requireAuth(context);
       if (projectId == null) {
-        db.delete(scheduleAssignments)
+        await db.delete(scheduleAssignments)
           .where(and(
             eq(scheduleAssignments.scheduleId, scheduleId),
             eq(scheduleAssignments.userId, userId),
             eq(scheduleAssignments.weekStart, weekStart),
-          ))
-          .run();
+          ));
         return null;
       }
 
       // Upsert: try to find existing
-      const existing = db
+      const [existing] = await db
         .select()
         .from(scheduleAssignments)
         .where(and(
           eq(scheduleAssignments.scheduleId, scheduleId),
           eq(scheduleAssignments.userId, userId),
           eq(scheduleAssignments.weekStart, weekStart),
-        ))
-        .get();
+        ));
 
       if (existing) {
-        const row = db
+        const [row] = await db
           .update(scheduleAssignments)
           .set({ projectId })
           .where(eq(scheduleAssignments.id, existing.id))
-          .returning()
-          .get();
+          .returning();
         return mapScheduleAssignmentFromDb(row);
       }
 
-      const row = db
+      const [row] = await db
         .insert(scheduleAssignments)
         .values({ scheduleId, userId, projectId, weekStart })
-        .returning()
-        .get();
+        .returning();
       return mapScheduleAssignmentFromDb(row);
     },
-    bulkSetScheduleAssignments: (
+    bulkSetScheduleAssignments: async (
       _: unknown,
       { scheduleId, assignments }: { scheduleId: number; assignments: { userId: number; weekStart: string; projectId: number | null }[] },
       context: Context,
@@ -650,50 +632,46 @@ export const resolvers = {
       requireAuth(context);
       for (const { userId, weekStart, projectId } of assignments) {
         if (projectId == null) {
-          db.delete(scheduleAssignments)
+          await db.delete(scheduleAssignments)
             .where(and(
               eq(scheduleAssignments.scheduleId, scheduleId),
               eq(scheduleAssignments.userId, userId),
               eq(scheduleAssignments.weekStart, weekStart),
-            ))
-            .run();
+            ));
         } else {
-          const existing = db
+          const [existing] = await db
             .select()
             .from(scheduleAssignments)
             .where(and(
               eq(scheduleAssignments.scheduleId, scheduleId),
               eq(scheduleAssignments.userId, userId),
               eq(scheduleAssignments.weekStart, weekStart),
-            ))
-            .get();
+            ));
 
           if (existing) {
-            db.update(scheduleAssignments)
+            await db.update(scheduleAssignments)
               .set({ projectId })
-              .where(eq(scheduleAssignments.id, existing.id))
-              .run();
+              .where(eq(scheduleAssignments.id, existing.id));
           } else {
-            db.insert(scheduleAssignments)
-              .values({ scheduleId, userId, projectId, weekStart })
-              .run();
+            await db.insert(scheduleAssignments)
+              .values({ scheduleId, userId, projectId, weekStart });
           }
         }
       }
       return true;
     },
-    linkAuthUser: (
+    linkAuthUser: async (
       _: unknown,
       { appUserId }: { appUserId: number },
       context: Context,
     ) => {
       const session = requireAuth(context);
-      const result = db
+      const updated = await db
         .update(users)
         .set({ authUserId: session.user.id })
         .where(eq(users.id, appUserId))
-        .run();
-      return result.changes > 0;
+        .returning();
+      return updated.length > 0;
     },
   },
 };
