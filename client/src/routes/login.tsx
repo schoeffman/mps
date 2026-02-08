@@ -54,10 +54,8 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() =>
-              signIn.social({ provider: "apple", callbackURL: window.location.origin + "/" })
-            }
-            className="flex w-full items-center justify-center gap-3 rounded-md border bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+            disabled
+            className="flex w-full items-center justify-center gap-3 rounded-md border bg-background px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed"
           >
             <AppleIcon />
             Continue with Apple
