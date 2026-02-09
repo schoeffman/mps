@@ -146,3 +146,10 @@ export const workHistory = pgTable("work_history", {
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [unique().on(table.userId, table.date, table.scheduleId)]);
+
+export const spaceMembers = pgTable("space_members", {
+  id: serial("id").primaryKey(),
+  spaceOwnerId: text("space_owner_id").notNull().references(() => authUser.id, { onDelete: "cascade" }),
+  memberAuthId: text("member_auth_id").notNull().references(() => authUser.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [unique().on(table.spaceOwnerId, table.memberAuthId)]);

@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
-import { eq, inArray, gte, lte, gt, lt, and, desc, asc } from "drizzle-orm";
+import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory, session, account, verification, authUser } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers } from "./db/schema.js";
 
 export interface Context {
   session: {
@@ -23,6 +23,7 @@ export interface Context {
       userAgent?: string | null | undefined;
     };
   } | null;
+  spaceOwnerId: string | null;
 }
 
 function requireAuth(context: Context) {
@@ -33,8 +34,8 @@ function requireAuth(context: Context) {
 }
 
 function getOwnerId(context: Context): string {
-  const session = requireAuth(context);
-  return session.user.id;
+  requireAuth(context);
+  return context.spaceOwnerId!;
 }
 
 export const typeDefs = gql`
@@ -192,6 +193,23 @@ export const typeDefs = gql`
     user: AuthUser!
   }
 
+  type Space {
+    id: String!
+    name: String!
+    email: String!
+    image: String
+    isOwner: Boolean!
+  }
+
+  type SpaceMember {
+    id: Int!
+    authId: String!
+    email: String!
+    name: String!
+    image: String
+    createdAt: String!
+  }
+
   type Query {
     hello: String
     users: [User!]!
@@ -207,6 +225,8 @@ export const typeDefs = gql`
     workHistoryDates(startDate: String!, endDate: String!): [String!]!
     workHistoryAdjacentDates(date: String!): WorkHistoryAdjacentDates!
     me: SessionInfo
+    mySpaces: [Space!]!
+    spaceMembers: [SpaceMember!]!
   }
 
   input BulkAssignmentInput {
@@ -232,6 +252,8 @@ export const typeDefs = gql`
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
     updateWorkHistoryEntry(id: Int!, projectId: Int!): WorkHistoryEntry!
     linkAuthUser(appUserId: Int!): Boolean!
+    addSpaceMember(email: String!): SpaceMember!
+    removeSpaceMember(memberAuthId: String!): Boolean!
     deleteMyAccount: Boolean!
   }
 `;
@@ -471,6 +493,37 @@ export const resolvers = {
           image: context.session.user.image,
         },
       };
+    },
+    mySpaces: async (_: unknown, __: unknown, context: Context) => {
+      const { user } = requireAuth(context);
+      // Own space
+      const ownSpace = { id: user.id, name: user.name, email: user.email, image: user.image ?? null, isOwner: true };
+      // Spaces where this user is a member
+      const memberships = await db
+        .select({ spaceOwnerId: spaceMembers.spaceOwnerId })
+        .from(spaceMembers)
+        .where(eq(spaceMembers.memberAuthId, user.id));
+      if (memberships.length === 0) return [ownSpace];
+      const ownerIds = memberships.map((m) => m.spaceOwnerId);
+      const owners = await db.select().from(authUser).where(inArray(authUser.id, ownerIds));
+      const otherSpaces = owners.map((o) => ({ id: o.id, name: o.name, email: o.email, image: o.image ?? null, isOwner: false }));
+      return [ownSpace, ...otherSpaces];
+    },
+    spaceMembers: async (_: unknown, __: unknown, context: Context) => {
+      const { user } = requireAuth(context);
+      // Only show members of your own space
+      const rows = await db
+        .select()
+        .from(spaceMembers)
+        .where(eq(spaceMembers.spaceOwnerId, user.id));
+      if (rows.length === 0) return [];
+      const memberIds = rows.map((r) => r.memberAuthId);
+      const memberUsers = await db.select().from(authUser).where(inArray(authUser.id, memberIds));
+      const userMap = new Map(memberUsers.map((u) => [u.id, u]));
+      return rows.map((r) => {
+        const u = userMap.get(r.memberAuthId);
+        return { id: r.id, authId: r.memberAuthId, email: u?.email ?? "", name: u?.name ?? "", image: u?.image ?? null, createdAt: r.createdAt.toISOString() };
+      });
     },
   },
   Mutation: {
@@ -800,8 +853,28 @@ export const resolvers = {
         .returning();
       return updated.length > 0;
     },
+    addSpaceMember: async (_: unknown, { email }: { email: string }, context: Context) => {
+      const { user } = requireAuth(context);
+      // Look up the target user by email
+      const [targetUser] = await db.select().from(authUser).where(eq(authUser.email, email));
+      if (!targetUser) throw new Error("No user found with that email");
+      if (targetUser.id === user.id) throw new Error("You cannot add yourself");
+      // Check for existing membership
+      const [existing] = await db.select().from(spaceMembers).where(and(eq(spaceMembers.spaceOwnerId, user.id), eq(spaceMembers.memberAuthId, targetUser.id)));
+      if (existing) throw new Error("This user is already a member of your space");
+      const [row] = await db.insert(spaceMembers).values({ spaceOwnerId: user.id, memberAuthId: targetUser.id }).returning();
+      return { id: row.id, authId: targetUser.id, email: targetUser.email, name: targetUser.name, image: targetUser.image ?? null, createdAt: row.createdAt.toISOString() };
+    },
+    removeSpaceMember: async (_: unknown, { memberAuthId }: { memberAuthId: string }, context: Context) => {
+      const { user } = requireAuth(context);
+      const deleted = await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceOwnerId, user.id), eq(spaceMembers.memberAuthId, memberAuthId))).returning();
+      return deleted.length > 0;
+    },
     deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
+
+      // Delete space memberships (both as owner and as member)
+      await db.delete(spaceMembers).where(or(eq(spaceMembers.spaceOwnerId, ownerId), eq(spaceMembers.memberAuthId, ownerId)));
 
       // Delete app data in FK-safe order
       // 0. Work history (references users, projects, schedules)

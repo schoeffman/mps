@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useSession } from "@/lib/auth-client";
+import { SpaceProvider } from "@/lib/space-context";
 
 export function ProtectedRoute() {
   const { data: session, isPending } = useSession();
@@ -16,5 +17,9 @@ export function ProtectedRoute() {
     return <Navigate to="/login" replace />;
   }
 
-  return <Outlet />;
+  return (
+    <SpaceProvider>
+      <Outlet />
+    </SpaceProvider>
+  );
 }

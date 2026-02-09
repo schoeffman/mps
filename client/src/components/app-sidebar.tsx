@@ -2,7 +2,8 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
-import { apolloClient } from "@/lib/apollo-client";
+import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
+import { SpaceSwitcher } from "@/components/space-switcher";
 import {
   Sidebar,
   SidebarHeader,
@@ -26,7 +27,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <span className="text-lg font-semibold px-2">MPS</span>
+        <SpaceSwitcher />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -117,6 +118,8 @@ export function AppSidebar() {
             type="button"
             onClick={async () => {
               await signOut();
+              setActiveSpaceId(null);
+              localStorage.removeItem("mps-active-space-id");
               await apolloClient.clearStore();
               navigate("/login");
             }}
