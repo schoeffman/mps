@@ -1,5 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo, createContext, useContext } from "react";
 import { useQuery, gql } from "@apollo/client";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { getProjectColor } from "@/lib/project-colors";
 
 const GET_WORK_HISTORY = gql`
@@ -21,41 +30,245 @@ const GET_WORK_HISTORY = gql`
   }
 `;
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+const GET_WORK_HISTORY_ADJACENT = gql`
+  query GetWorkHistoryAdjacentDates($date: String!) {
+    workHistoryAdjacentDates(date: $date) {
+      previous
+      next
+    }
+  }
+`;
+
+const GET_WORK_HISTORY_DATES = gql`
+  query GetWorkHistoryDates($startDate: String!, $endDate: String!) {
+    workHistoryDates(startDate: $startDate, endDate: $endDate)
+  }
+`;
+
+function toISO(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplayDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString("default", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function getMonthRange(month: Date) {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const start = new Date(y, m, 1);
+  const end = new Date(y, m + 1, 0);
+  return { startDate: toISO(start), endDate: toISO(end) };
+}
+
+const DatesWithDataCtx = createContext<{
+  dates: Set<string>;
+  loaded: boolean;
+}>({ dates: new Set(), loaded: false });
+
+function DayButtonWithTooltip(
+  props: React.ComponentProps<typeof CalendarDayButton>,
+) {
+  const { dates, loaded } = useContext(DatesWithDataCtx);
+  const iso = toISO(props.day.date);
+  const showNoData = loaded && !props.modifiers.outside && !dates.has(iso);
+
+  if (!showNoData) {
+    return <CalendarDayButton {...props} />;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex size-full items-center justify-center">
+          <CalendarDayButton {...props} />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top">No data for this day</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export default function WorkHistory() {
-  const [date, setDate] = useState(todayISO);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [month, setMonth] = useState(new Date());
+
+  const { startDate, endDate } = getMonthRange(month);
+  const { data: datesData, loading: datesLoading } = useQuery(
+    GET_WORK_HISTORY_DATES,
+    { variables: { startDate, endDate } },
+  );
+
+  const datesCtx = useMemo(
+    () => ({
+      dates: new Set<string>(datesData?.workHistoryDates ?? []),
+      loaded: !datesLoading,
+    }),
+    [datesData, datesLoading],
+  );
+
+  const calendarValue = selectedDate
+    ? new Date(selectedDate + "T00:00:00")
+    : undefined;
+
+  return (
+    <>
+      <h1 className="text-2xl font-semibold">Work History</h1>
+
+      {selectedDate ? (
+        <DayDetail
+          date={selectedDate}
+          onBack={() => setSelectedDate(null)}
+          onNavigate={setSelectedDate}
+        />
+      ) : (
+        <div className="mt-4 flex justify-center">
+          <DatesWithDataCtx.Provider value={datesCtx}>
+            <TooltipProvider>
+              <Calendar
+                mode="single"
+                selected={calendarValue}
+                onSelect={(date) => {
+                  if (!date) return;
+                  const iso = toISO(date);
+                  if (!datesCtx.loaded || datesCtx.dates.has(iso)) {
+                    setSelectedDate(iso);
+                  }
+                }}
+                month={month}
+                onMonthChange={setMonth}
+                modifiers={{
+                  noData: (date) => {
+                    if (!datesCtx.loaded) return false;
+                    return (
+                      date.getMonth() === month.getMonth() &&
+                      date.getFullYear() === month.getFullYear() &&
+                      !datesCtx.dates.has(toISO(date))
+                    );
+                  },
+                }}
+                modifiersClassNames={{
+                  noData: "opacity-35",
+                }}
+                className="rounded-md border shadow-xs"
+                classNames={{
+                  day: "relative w-full h-full p-0 text-center group/day aspect-square select-none [--cell-size:--spacing(12)]",
+                }}
+                components={{
+                  DayButton: DayButtonWithTooltip,
+                }}
+              />
+            </TooltipProvider>
+          </DatesWithDataCtx.Provider>
+        </div>
+      )}
+    </>
+  );
+}
+
+function DayDetail({
+  date,
+  onBack,
+  onNavigate,
+}: {
+  date: string;
+  onBack: () => void;
+  onNavigate: (date: string) => void;
+}) {
   const { loading, error, data } = useQuery(GET_WORK_HISTORY, {
+    variables: { date },
+  });
+  const { data: adjData } = useQuery(GET_WORK_HISTORY_ADJACENT, {
     variables: { date },
   });
 
   const entries = data?.workHistory ?? [];
+  const prevDate = adjData?.workHistoryAdjacentDates?.previous ?? null;
+  const nextDate = adjData?.workHistoryAdjacentDates?.next ?? null;
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Work History</h1>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-xs"
-        />
+    <div className="mt-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onBack}
+        className="mb-3 -ml-2"
+      >
+        <ArrowLeft className="size-4 mr-1" />
+        Back to calendar
+      </Button>
+
+      <div className="flex items-center gap-2 mb-4">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={!prevDate}
+                  onClick={() => prevDate && onNavigate(prevDate)}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {prevDate
+                ? `Go to ${formatDisplayDate(prevDate)}`
+                : "No earlier data available"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <h2 className="text-lg font-medium">{formatDisplayDate(date)}</h2>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  disabled={!nextDate}
+                  onClick={() => nextDate && onNavigate(nextDate)}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {nextDate
+                ? `Go to ${formatDisplayDate(nextDate)}`
+                : "No later data available"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {loading && <p>Loading...</p>}
       {error && <p>Error: {error.message}</p>}
 
       {!loading && !error && entries.length === 0 && (
-        <p className="text-muted-foreground mt-4">
-          No work history recorded for {date}.
+        <p className="text-muted-foreground">
+          No work history recorded for this date.
         </p>
       )}
 
       {entries.length > 0 && (
-        <div className="mt-4 rounded-md border">
+        <div className="rounded-md border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
@@ -87,6 +300,6 @@ export default function WorkHistory() {
           </table>
         </div>
       )}
-    </>
+    </div>
   );
 }

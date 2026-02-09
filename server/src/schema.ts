@@ -1,5 +1,5 @@
 import gql from "graphql-tag";
-import { eq, inArray, gte, lte, and } from "drizzle-orm";
+import { eq, inArray, gte, lte, gt, lt, and, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory, session, account, verification, authUser } from "./db/schema.js";
 
@@ -176,6 +176,11 @@ export const typeDefs = gql`
     scheduleName: String!
   }
 
+  type WorkHistoryAdjacentDates {
+    previous: String
+    next: String
+  }
+
   type AuthUser {
     id: String!
     name: String!
@@ -199,6 +204,8 @@ export const typeDefs = gql`
     schedule(id: Int!): Schedule
     scheduleAssignments(scheduleId: Int!, startDate: String!, endDate: String!): [ScheduleAssignment!]!
     workHistory(date: String!): [WorkHistoryEntry!]!
+    workHistoryDates(startDate: String!, endDate: String!): [String!]!
+    workHistoryAdjacentDates(date: String!): WorkHistoryAdjacentDates!
     me: SessionInfo
   }
 
@@ -416,6 +423,37 @@ export const resolvers = {
           };
         }),
       );
+    },
+    workHistoryDates: async (_: unknown, { startDate, endDate }: { startDate: string; endDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db
+        .selectDistinct({ date: workHistory.date })
+        .from(workHistory)
+        .where(and(
+          eq(workHistory.ownerId, ownerId),
+          gte(workHistory.date, startDate),
+          lte(workHistory.date, endDate),
+        ));
+      return rows.map((r) => r.date);
+    },
+    workHistoryAdjacentDates: async (_: unknown, { date }: { date: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [prevRow] = await db
+        .selectDistinct({ date: workHistory.date })
+        .from(workHistory)
+        .where(and(eq(workHistory.ownerId, ownerId), lt(workHistory.date, date)))
+        .orderBy(desc(workHistory.date))
+        .limit(1);
+      const [nextRow] = await db
+        .selectDistinct({ date: workHistory.date })
+        .from(workHistory)
+        .where(and(eq(workHistory.ownerId, ownerId), gt(workHistory.date, date)))
+        .orderBy(asc(workHistory.date))
+        .limit(1);
+      return {
+        previous: prevRow?.date ?? null,
+        next: nextRow?.date ?? null,
+      };
     },
     me: (_: unknown, __: unknown, context: Context) => {
       if (!context.session) return null;
