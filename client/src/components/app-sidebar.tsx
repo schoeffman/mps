@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
+import { apolloClient } from "@/lib/apollo-client";
 import {
   Sidebar,
   SidebarHeader,
@@ -106,6 +107,7 @@ export function AppSidebar() {
             type="button"
             onClick={async () => {
               await signOut();
+              await apolloClient.clearStore();
               navigate("/login");
             }}
             className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"

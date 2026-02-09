@@ -1,7 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { ApolloClient, InMemoryCache, ApolloProvider } from "@apollo/client";
+import { ApolloProvider } from "@apollo/client";
+import { apolloClient } from "./lib/apollo-client";
 import { ProtectedRoute } from "./components/protected-route";
 import Login from "./routes/login";
 import Root from "./routes/root";
@@ -15,12 +16,6 @@ import ProjectDetail from "./routes/project-detail";
 import Schedules from "./routes/schedules";
 import ScheduleDetail from "./routes/schedule-detail";
 import "./index.css";
-
-const apolloClient = new ApolloClient({
-  uri: "/graphql",
-  cache: new InMemoryCache(),
-  credentials: "include",
-});
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
