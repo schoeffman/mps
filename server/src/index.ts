@@ -9,6 +9,7 @@ import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { typeDefs, resolvers, type Context } from "./schema.js";
 import { auth } from "./auth.js";
 import { seedDemoDataForOwner } from "./db/seed-demo-data.js";
+import { startWorkHistoryCron } from "./jobs/snapshot-work-history.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -65,4 +66,5 @@ if (isProd) {
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}/graphql`);
+  startWorkHistoryCron();
 });

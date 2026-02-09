@@ -6,24 +6,27 @@
     "dev": "tsx watch src/index.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
+    "db:reseed": "tsx src/db/seed.ts --auto",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@apollo/server": "^4.11.0",
     "better-auth": "^1.4.18",
-    "pg": "^8.13.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.4",
     "drizzle-orm": "^0.45.1",
     "express": "^4.21.0",
     "graphql": "^16.9.0",
     "graphql-tag": "^2.12.6",
+    "node-cron": "^4.2.1",
+    "pg": "^8.13.1",
     "tsx": "^4.19.0"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.10",
     "drizzle-kit": "^0.31.8"
   }
 }

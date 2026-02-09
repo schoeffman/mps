@@ -135,3 +135,13 @@ export const scheduleAssignments = pgTable(
   },
   (table) => [unique().on(table.scheduleId, table.userId, table.weekStart)],
 );
+
+export const workHistory = pgTable("work_history", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  projectId: integer("project_id").notNull().references(() => projects.id),
+  scheduleId: integer("schedule_id").notNull().references(() => schedules.id),
+  date: text("date").notNull(),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [unique().on(table.userId, table.date, table.scheduleId)]);

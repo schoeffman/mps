@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, and } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, session, account, verification, authUser } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory, session, account, verification, authUser } from "./db/schema.js";
 
 export interface Context {
   session: {
@@ -168,6 +168,14 @@ export const typeDefs = gql`
     weekStart: String!
   }
 
+  type WorkHistoryEntry {
+    id: Int!
+    date: String!
+    user: User!
+    project: Project!
+    scheduleName: String!
+  }
+
   type AuthUser {
     id: String!
     name: String!
@@ -190,6 +198,7 @@ export const typeDefs = gql`
     schedules: [Schedule!]!
     schedule(id: Int!): Schedule
     scheduleAssignments(scheduleId: Int!, startDate: String!, endDate: String!): [ScheduleAssignment!]!
+    workHistory(date: String!): [WorkHistoryEntry!]!
     me: SessionInfo
   }
 
@@ -379,6 +388,34 @@ export const resolvers = {
           lte(scheduleAssignments.weekStart, endDate),
         ));
       return rows.map(mapScheduleAssignmentFromDb);
+    },
+    workHistory: async (_: unknown, { date }: { date: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db
+        .select({
+          id: workHistory.id,
+          date: workHistory.date,
+          userId: workHistory.userId,
+          projectId: workHistory.projectId,
+          scheduleId: workHistory.scheduleId,
+        })
+        .from(workHistory)
+        .where(and(eq(workHistory.ownerId, ownerId), eq(workHistory.date, date)));
+
+      return Promise.all(
+        rows.map(async (row) => {
+          const [userRow] = await db.select().from(users).where(eq(users.id, row.userId));
+          const [projectRow] = await db.select().from(projects).where(eq(projects.id, row.projectId));
+          const [scheduleRow] = await db.select().from(schedules).where(eq(schedules.id, row.scheduleId));
+          return {
+            id: row.id,
+            date: row.date,
+            user: userRow ? mapUserFromDb(userRow) : null,
+            project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
+            scheduleName: scheduleRow?.name ?? "Unknown",
+          };
+        }),
+      );
     },
     me: (_: unknown, __: unknown, context: Context) => {
       if (!context.session) return null;
@@ -700,6 +737,9 @@ export const resolvers = {
       const ownerId = getOwnerId(context);
 
       // Delete app data in FK-safe order
+      // 0. Work history (references users, projects, schedules)
+      await db.delete(workHistory).where(eq(workHistory.ownerId, ownerId));
+
       // 1. Schedule assignments (references schedules, users, projects)
       const ownerScheduleIds = db.select({ id: schedules.id }).from(schedules).where(eq(schedules.ownerId, ownerId));
       await db.delete(scheduleAssignments).where(inArray(scheduleAssignments.scheduleId, ownerScheduleIds));

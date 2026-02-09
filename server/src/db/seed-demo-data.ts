@@ -1,5 +1,5 @@
 import { db } from "./index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory } from "./schema.js";
 import { eq } from "drizzle-orm";
 
 const seedUsers = [
@@ -195,6 +195,22 @@ export async function seedDemoDataForOwner(ownerId: string) {
 
     await db.insert(scheduleAssignments).values(scheduleValues);
     console.log(`Seeded ${scheduleValues.length} schedule assignments.`);
+
+    // Seed work history — snapshot current-week assignments for recent days
+    const currentWeekAssignments = scheduleData.filter((s) => s.weekStart === "2026-02-02");
+    const historyDays = ["2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-07"];
+    const workHistoryValues = historyDays.flatMap((date) =>
+      currentWeekAssignments.map((s) => ({
+        userId: userByName[s.userName].id,
+        projectId: projectByName[s.projectName].id,
+        scheduleId: insertedSchedule.id,
+        date,
+        ownerId,
+      })),
+    );
+
+    await db.insert(workHistory).values(workHistoryValues);
+    console.log(`Seeded ${workHistoryValues.length} work history entries.`);
 
     console.log(`Demo data seeding complete for owner ${ownerId}.`);
   } catch (err) {

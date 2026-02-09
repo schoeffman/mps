@@ -1,5 +1,5 @@
 import { NavLink, Link, useNavigate } from "react-router-dom";
-import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, LogOut } from "lucide-react";
+import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apolloClient } from "@/lib/apollo-client";
@@ -70,6 +70,14 @@ export function AppSidebar() {
                   <NavLink to="/schedules" className={({ isActive }) => isActive ? "font-semibold" : ""}>
                     <CalendarDays className="size-4" />
                     Schedules
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/work-history" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <ClipboardList className="size-4" />
+                    Work History
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
