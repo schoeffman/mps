@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
@@ -89,20 +89,22 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2">
-          {user?.image ? (
-            <img
-              src={user.image}
-              alt=""
-              className="size-8 rounded-full"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="size-8 rounded-full bg-muted" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium">{user?.name ?? "User"}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email ?? ""}</p>
-          </div>
+          <Link to="/settings" className="flex items-center gap-2 flex-1 min-w-0 rounded-md hover:bg-accent transition-colors p-1 -m-1">
+            {user?.image ? (
+              <img
+                src={user.image}
+                alt=""
+                className="size-8 rounded-full"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="size-8 rounded-full bg-muted" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium">{user?.name ?? "User"}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email ?? ""}</p>
+            </div>
+          </Link>
           <button
             type="button"
             onClick={async () => {

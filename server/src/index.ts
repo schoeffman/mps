@@ -8,6 +8,7 @@ import express from "express";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
 import { typeDefs, resolvers, type Context } from "./schema.js";
 import { auth } from "./auth.js";
+import { seedDemoDataForOwner } from "./db/seed-demo-data.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -21,6 +22,9 @@ app.all("/api/auth/*", toNodeHandler(auth));
 const server = new ApolloServer<Context>({ typeDefs, resolvers });
 await server.start();
 
+// Track which users have already been checked for demo data this server lifetime
+const seededUsers = new Set<string>();
+
 app.use(
   "/graphql",
   cors({ origin: CORS_ORIGIN, credentials: true }),
@@ -30,6 +34,17 @@ app.use(
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
+
+      // Lazy-seed demo data on first authenticated request per user
+      if (session && !seededUsers.has(session.user.id)) {
+        seededUsers.add(session.user.id);
+        try {
+          await seedDemoDataForOwner(session.user.id);
+        } catch (err) {
+          console.error("Failed to seed demo data:", err);
+        }
+      }
+
       return { session };
     },
   }),

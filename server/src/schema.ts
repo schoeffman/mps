@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, and } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, session, account, verification, authUser } from "./db/schema.js";
 
 export interface Context {
   session: {
@@ -215,6 +215,7 @@ export const typeDefs = gql`
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
     linkAuthUser(appUserId: Int!): Boolean!
+    deleteMyAccount: Boolean!
   }
 `;
 
@@ -694,6 +695,41 @@ export const resolvers = {
         .where(and(eq(users.id, appUserId), eq(users.ownerId, ownerId)))
         .returning();
       return updated.length > 0;
+    },
+    deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+
+      // Delete app data in FK-safe order
+      // 1. Schedule assignments (references schedules, users, projects)
+      const ownerScheduleIds = db.select({ id: schedules.id }).from(schedules).where(eq(schedules.ownerId, ownerId));
+      await db.delete(scheduleAssignments).where(inArray(scheduleAssignments.scheduleId, ownerScheduleIds));
+
+      // 2. Schedules
+      await db.delete(schedules).where(eq(schedules.ownerId, ownerId));
+
+      // 3. Project members (references projects, users)
+      const ownerProjectIds = db.select({ id: projects.id }).from(projects).where(eq(projects.ownerId, ownerId));
+      await db.delete(projectMembers).where(inArray(projectMembers.projectId, ownerProjectIds));
+
+      // 4. Projects
+      await db.delete(projects).where(eq(projects.ownerId, ownerId));
+
+      // 5. Team members (references teams, users)
+      const ownerTeamIds = db.select({ id: teams.id }).from(teams).where(eq(teams.ownerId, ownerId));
+      await db.delete(teamMembers).where(inArray(teamMembers.teamId, ownerTeamIds));
+
+      // 6. Teams
+      await db.delete(teams).where(eq(teams.ownerId, ownerId));
+
+      // 7. App users
+      await db.delete(users).where(eq(users.ownerId, ownerId));
+
+      // Delete auth data
+      await db.delete(session).where(eq(session.userId, ownerId));
+      await db.delete(account).where(eq(account.userId, ownerId));
+      await db.delete(authUser).where(eq(authUser.id, ownerId));
+
+      return true;
     },
   },
 };

@@ -2,7 +2,6 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db/index.js";
 import * as schema from "./db/schema.js";
-import { seedDemoDataForOwner } from "./db/seed-demo-data.js";
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:4000",
@@ -15,19 +14,6 @@ export const auth = betterAuth({
       verification: schema.verification,
     },
   }),
-  databaseHooks: {
-    user: {
-      create: {
-        after: async (user) => {
-          try {
-            await seedDemoDataForOwner(user.id);
-          } catch (err) {
-            console.error("Failed to seed demo data:", err);
-          }
-        },
-      },
-    },
-  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
