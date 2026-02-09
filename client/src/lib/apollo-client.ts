@@ -1,6 +1,6 @@
 import { ApolloClient, InMemoryCache, ApolloLink, HttpLink } from "@apollo/client";
 
-let activeSpaceId: string | null = null;
+let activeSpaceId: string | null = localStorage.getItem("mps-active-space-id");
 
 export function setActiveSpaceId(id: string | null) {
   activeSpaceId = id;

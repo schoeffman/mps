@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useState, useMemo } from "react";
 import { gql, useQuery } from "@apollo/client";
-import { apolloClient, setActiveSpaceId, getActiveSpaceId } from "@/lib/apollo-client";
+import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
 
 const MY_SPACES = gql`
   query MySpaces {
@@ -44,33 +44,22 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const { data, loading } = useQuery<{ mySpaces: Space[] }>(MY_SPACES);
   const spaces = data?.mySpaces ?? [];
 
-  // Resolve active space: use stored ID if still valid, otherwise fall back to own space
+  // React state drives which space is selected — initialized from localStorage
+  const [activeId, setActiveId] = useState(() => localStorage.getItem(STORAGE_KEY));
+
+  // Resolve active space: match activeId in the spaces list, fall back to own space
   const activeSpace = useMemo(() => {
     if (spaces.length === 0) return null;
-    const storedId = localStorage.getItem(STORAGE_KEY);
-    const found = storedId ? spaces.find((s) => s.id === storedId) : null;
+    const found = activeId ? spaces.find((s) => s.id === activeId) : null;
     return found ?? spaces.find((s) => s.isOwner) ?? spaces[0];
-  }, [spaces]);
-
-  // Keep module-level ID in sync
-  useEffect(() => {
-    if (activeSpace) {
-      setActiveSpaceId(activeSpace.id);
-      localStorage.setItem(STORAGE_KEY, activeSpace.id);
-    }
-  }, [activeSpace]);
-
-  // On initial mount, restore stored space ID so first query uses correct header
-  useEffect(() => {
-    const storedId = localStorage.getItem(STORAGE_KEY);
-    if (storedId && !getActiveSpaceId()) {
-      setActiveSpaceId(storedId);
-    }
-  }, []);
+  }, [spaces, activeId]);
 
   function switchSpace(id: string) {
+    // Update React state (triggers re-render), module var (for Apollo link), and localStorage
+    setActiveId(id);
     setActiveSpaceId(id);
     localStorage.setItem(STORAGE_KEY, id);
+    // Refetch all active queries with the new x-space-id header
     apolloClient.resetStore();
   }
 
