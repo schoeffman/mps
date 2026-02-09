@@ -10,6 +10,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { getProjectColor } from "@/lib/project-colors";
+import { EditWorkHistoryDialog } from "@/components/edit-work-history-dialog";
 
 const GET_WORK_HISTORY = gql`
   query GetWorkHistory($date: String!) {
@@ -275,6 +276,7 @@ function DayDetail({
                 <th className="px-4 py-2 text-left font-medium">User</th>
                 <th className="px-4 py-2 text-left font-medium">Project</th>
                 <th className="px-4 py-2 text-left font-medium">Schedule</th>
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
@@ -292,6 +294,9 @@ function DayDetail({
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">
                       {entry.scheduleName}
+                    </td>
+                    <td className="px-2 py-2">
+                      <EditWorkHistoryDialog entry={entry} />
                     </td>
                   </tr>
                 );

@@ -230,6 +230,7 @@ export const typeDefs = gql`
     deleteSchedule(id: Int!): Boolean!
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
+    updateWorkHistoryEntry(id: Int!, projectId: Int!): WorkHistoryEntry!
     linkAuthUser(appUserId: Int!): Boolean!
     deleteMyAccount: Boolean!
   }
@@ -405,6 +406,7 @@ export const resolvers = {
           userId: workHistory.userId,
           projectId: workHistory.projectId,
           scheduleId: workHistory.scheduleId,
+          manuallyEdited: workHistory.manuallyEdited,
         })
         .from(workHistory)
         .where(and(eq(workHistory.ownerId, ownerId), eq(workHistory.date, date)));
@@ -413,13 +415,17 @@ export const resolvers = {
         rows.map(async (row) => {
           const [userRow] = await db.select().from(users).where(eq(users.id, row.userId));
           const [projectRow] = await db.select().from(projects).where(eq(projects.id, row.projectId));
-          const [scheduleRow] = await db.select().from(schedules).where(eq(schedules.id, row.scheduleId));
+          let scheduleName = "Manually Entered";
+          if (!row.manuallyEdited) {
+            const [scheduleRow] = await db.select().from(schedules).where(eq(schedules.id, row.scheduleId));
+            scheduleName = scheduleRow?.name ?? "Unknown";
+          }
           return {
             id: row.id,
             date: row.date,
             user: userRow ? mapUserFromDb(userRow) : null,
             project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
-            scheduleName: scheduleRow?.name ?? "Unknown",
+            scheduleName,
           };
         }),
       );
@@ -757,6 +763,29 @@ export const resolvers = {
         }
       }
       return true;
+    },
+    updateWorkHistoryEntry: async (
+      _: unknown,
+      { id, projectId }: { id: number; projectId: number },
+      context: Context,
+    ) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .update(workHistory)
+        .set({ projectId, manuallyEdited: true })
+        .where(and(eq(workHistory.id, id), eq(workHistory.ownerId, ownerId)))
+        .returning();
+      if (!row) throw new Error("Work history entry not found");
+
+      const [userRow] = await db.select().from(users).where(eq(users.id, row.userId));
+      const [projectRow] = await db.select().from(projects).where(eq(projects.id, row.projectId));
+      return {
+        id: row.id,
+        date: row.date,
+        user: userRow ? mapUserFromDb(userRow) : null,
+        project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
+        scheduleName: "Manually Entered",
+      };
     },
     linkAuthUser: async (
       _: unknown,
