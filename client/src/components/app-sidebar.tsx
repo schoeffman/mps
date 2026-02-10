@@ -3,7 +3,6 @@ import { Home, Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, Clipboa
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
-import { SpaceSwitcher } from "@/components/space-switcher";
 import {
   Sidebar,
   SidebarHeader,
@@ -27,7 +26,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <SpaceSwitcher />
+        <span className="text-lg font-semibold px-2">MPS</span>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
