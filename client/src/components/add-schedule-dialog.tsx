@@ -39,6 +39,7 @@ export function AddScheduleDialog() {
   const [name, setName] = useState("");
   const [year, setYear] = useState(String(currentYear));
   const [quarter, setQuarter] = useState("1");
+  const [error, setError] = useState("");
 
   const [createSchedule, { loading }] = useMutation(CREATE_SCHEDULE, {
     refetchQueries: [{ query: GET_SCHEDULES }],
@@ -48,17 +49,25 @@ export function AddScheduleDialog() {
     setName("");
     setYear(String(currentYear));
     setQuarter("1");
+    setError("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await createSchedule({
-      variables: {
-        input: { name, year: Number(year), quarter: Number(quarter) },
-      },
-    });
-    resetForm();
-    setOpen(false);
+    setError("");
+    try {
+      await createSchedule({
+        variables: {
+          input: { name, year: Number(year), quarter: Number(quarter) },
+        },
+      });
+      resetForm();
+      setOpen(false);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      }
+    }
   }
 
   return (
@@ -112,6 +121,9 @@ export function AddScheduleDialog() {
             </Select>
           </div>
 
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
           <Button type="submit" disabled={loading || !name}>
             {loading ? "Creating..." : "Create Schedule"}
           </Button>

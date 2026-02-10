@@ -707,6 +707,8 @@ export const resolvers = {
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
+      const [existing] = await db.select().from(schedules).where(and(eq(schedules.ownerId, ownerId), eq(schedules.year, input.year), eq(schedules.quarter, input.quarter)));
+      if (existing) throw new Error(`A schedule for Q${input.quarter} ${input.year} already exists`);
       const [row] = await db
         .insert(schedules)
         .values({ name: input.name, year: input.year, quarter: input.quarter, ownerId })
@@ -719,6 +721,8 @@ export const resolvers = {
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
+      const [conflict] = await db.select().from(schedules).where(and(eq(schedules.ownerId, ownerId), eq(schedules.year, input.year), eq(schedules.quarter, input.quarter)));
+      if (conflict && conflict.id !== id) throw new Error(`A schedule for Q${input.quarter} ${input.year} already exists`);
       const [row] = await db
         .update(schedules)
         .set({ name: input.name, year: input.year, quarter: input.quarter })

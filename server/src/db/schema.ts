@@ -115,7 +115,7 @@ export const schedules = pgTable("schedules", {
   quarter: integer("quarter").notNull(),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [unique().on(table.ownerId, table.year, table.quarter)]);
 
 export const scheduleAssignments = pgTable(
   "schedule_assignments",
