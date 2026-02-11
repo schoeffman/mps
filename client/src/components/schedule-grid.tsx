@@ -248,7 +248,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                       {holidays.length > 0 && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Flag className="inline-block ml-1 h-3 w-3 text-muted-foreground align-text-top" />
+                            <Flag className="inline-block ml-1 h-3 w-3 text-yellow-500 align-text-top" />
                           </TooltipTrigger>
                           <TooltipContent>
                             {holidays.join(", ")}
