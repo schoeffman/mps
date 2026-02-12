@@ -413,7 +413,7 @@ export const resolvers = {
     },
     schedules: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
-      const rows = await db.select().from(schedules).where(eq(schedules.ownerId, ownerId));
+      const rows = await db.select().from(schedules).where(eq(schedules.ownerId, ownerId)).orderBy(desc(schedules.year), desc(schedules.quarter));
       return rows.map(mapScheduleFromDb);
     },
     schedule: async (_: unknown, { id }: { id: number }, context: Context) => {
