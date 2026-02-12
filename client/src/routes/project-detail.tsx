@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import {
   AlertDialog,
@@ -45,6 +47,11 @@ const GET_PROJECT = gql`
         jobLevel
         craftFocus
       }
+      links {
+        id
+        url
+        createdAt
+      }
       createdAt
     }
   }
@@ -53,6 +60,22 @@ const GET_PROJECT = gql`
 const DELETE_PROJECT = gql`
   mutation DeleteProject($id: Int!) {
     deleteProject(id: $id)
+  }
+`;
+
+const ADD_PROJECT_LINK = gql`
+  mutation AddProjectLink($projectId: Int!, $url: String!) {
+    addProjectLink(projectId: $projectId, url: $url) {
+      id
+      url
+      createdAt
+    }
+  }
+`;
+
+const REMOVE_PROJECT_LINK = gql`
+  mutation RemoveProjectLink($id: Int!) {
+    removeProjectLink(id: $id)
   }
 `;
 
@@ -70,12 +93,21 @@ function formatEnum(value: string) {
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const projectId = Number(id);
   const { loading, error, data } = useQuery(GET_PROJECT, {
-    variables: { id: Number(id) },
+    variables: { id: projectId },
   });
   const [deleteProject] = useMutation(DELETE_PROJECT, {
     refetchQueries: [{ query: GET_PROJECTS }],
   });
+  const [addProjectLink, { loading: addingLink }] = useMutation(ADD_PROJECT_LINK, {
+    refetchQueries: [{ query: GET_PROJECT, variables: { id: projectId } }],
+  });
+  const [removeProjectLink] = useMutation(REMOVE_PROJECT_LINK, {
+    refetchQueries: [{ query: GET_PROJECT, variables: { id: projectId } }],
+  });
+
+  const [linkUrl, setLinkUrl] = useState("");
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
@@ -84,8 +116,19 @@ export default function ProjectDetail() {
   const { project } = data;
 
   async function handleDelete() {
-    await deleteProject({ variables: { id: Number(id) } });
+    await deleteProject({ variables: { id: projectId } });
     navigate("/projects");
+  }
+
+  async function handleAddLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!linkUrl.trim()) return;
+    await addProjectLink({ variables: { projectId, url: linkUrl.trim() } });
+    setLinkUrl("");
+  }
+
+  async function handleRemoveLink(linkId: number) {
+    await removeProjectLink({ variables: { id: linkId } });
   }
 
   return (
@@ -162,6 +205,51 @@ export default function ProjectDetail() {
           ))}
         </TableBody>
       </Table>
+
+      {/* Links Section */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold mb-2">Links</h2>
+        {project.links.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {project.links.map((link: { id: number; url: string }) => (
+              <div key={link.id} className="flex items-center gap-2 rounded-lg border p-2">
+                <a href={link.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+                  <ExternalLink className="size-4" />
+                </a>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline truncate flex-1 min-w-0"
+                >
+                  {link.url}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveLink(link.id)}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  title="Remove link"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <form onSubmit={handleAddLink} className="flex gap-2">
+          <Input
+            type="url"
+            placeholder="https://..."
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            required
+            className="max-w-sm"
+          />
+          <Button type="submit" variant="outline" disabled={addingLink}>
+            {addingLink ? "Adding..." : "Add Link"}
+          </Button>
+        </form>
+      </section>
     </>
   );
 }

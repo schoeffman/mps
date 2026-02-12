@@ -1,5 +1,5 @@
 import { db } from "./index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory } from "./schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory } from "./schema.js";
 import { eq } from "drizzle-orm";
 
 const seedUsers = [
@@ -128,6 +128,23 @@ export async function seedDemoDataForOwner(ownerId: string) {
 
     await db.insert(projectMembers).values(projectMemberships);
     console.log(`Seeded ${projectMemberships.length} project memberships.`);
+
+    // Seed project links
+    const seedLinks = [
+      { projectName: "Website Redesign", url: "https://www.figma.com/file/website-redesign-mockups" },
+      { projectName: "Website Redesign", url: "https://docs.google.com/document/d/website-redesign-prd" },
+      { projectName: "API v2 Migration", url: "https://github.com/org/api-v2-migration" },
+      { projectName: "API v2 Migration", url: "https://docs.google.com/document/d/api-v2-rfc" },
+      { projectName: "API v2 Migration", url: "https://linear.app/org/project/api-v2" },
+      { projectName: "Mobile App Launch", url: "https://www.figma.com/file/mobile-app-designs" },
+      { projectName: "Mobile App Launch", url: "https://testflight.apple.com/join/mobile-beta" },
+      { projectName: "Data Pipeline Upgrade", url: "https://github.com/org/data-pipeline-v2" },
+    ];
+
+    await db.insert(projectLinks).values(
+      seedLinks.map((l) => ({ projectId: projectByName[l.projectName].id, url: l.url })),
+    );
+    console.log(`Seeded ${seedLinks.length} project links.`);
 
     // Seed schedule
     const [insertedSchedule] = await db

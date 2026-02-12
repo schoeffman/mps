@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers } from "./db/schema.js";
 
 export interface Context {
   session: {
@@ -117,6 +117,12 @@ export const typeDefs = gql`
     Maintenance
   }
 
+  type ProjectLink {
+    id: Int!
+    url: String!
+    createdAt: String!
+  }
+
   type Project {
     id: Int!
     name: String!
@@ -126,6 +132,7 @@ export const typeDefs = gql`
     color: String!
     projectType: ProjectType!
     members: [User!]!
+    links: [ProjectLink!]!
     createdAt: String!
   }
 
@@ -259,6 +266,8 @@ export const typeDefs = gql`
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
     updateWorkHistoryEntry(id: Int!, projectId: Int!): WorkHistoryEntry!
+    addProjectLink(projectId: Int!, url: String!): ProjectLink!
+    removeProjectLink(id: Int!): Boolean!
     linkAuthUser(appUserId: Int!): Boolean!
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
@@ -361,6 +370,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     .from(projectMembers)
     .innerJoin(users, eq(projectMembers.userId, users.id))
     .where(eq(projectMembers.projectId, projectRow.id));
+  const linkRows = await db.select().from(projectLinks).where(eq(projectLinks.projectId, projectRow.id));
 
   return {
     id: projectRow.id,
@@ -371,6 +381,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     color: projectRow.color,
     projectType: projectTypeFromDb[projectRow.projectType] ?? "FeatureDevelopment",
     members: memberRows.map((r) => mapUserFromDb(r.user)),
+    links: linkRows.map((l) => ({ id: l.id, url: l.url, createdAt: l.createdAt.toISOString() })),
     createdAt: projectRow.createdAt.toISOString(),
   };
 }
@@ -864,6 +875,24 @@ export const resolvers = {
         project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
         scheduleName: "Manually Entered",
       };
+    },
+    addProjectLink: async (_: unknown, { projectId, url }: { projectId: number; url: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      // Verify project ownership
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      const [row] = await db.insert(projectLinks).values({ projectId, url }).returning();
+      return { id: row.id, url: row.url, createdAt: row.createdAt.toISOString() };
+    },
+    removeProjectLink: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      // Verify the link belongs to a project the user owns
+      const [link] = await db.select().from(projectLinks).where(eq(projectLinks.id, id));
+      if (!link) throw new Error("Link not found");
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, link.projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      await db.delete(projectLinks).where(eq(projectLinks.id, id));
+      return true;
     },
     linkAuthUser: async (
       _: unknown,

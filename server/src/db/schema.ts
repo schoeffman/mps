@@ -99,6 +99,15 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const projectLinks = pgTable("project_links", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const projectMembers = pgTable("project_members", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id")
