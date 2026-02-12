@@ -6,7 +6,6 @@ import { apolloClient } from "./lib/apollo-client";
 import { ProtectedRoute } from "./components/protected-route";
 import Login from "./routes/login";
 import Root from "./routes/root";
-import Home from "./routes/home";
 import Users from "./routes/users";
 import Teams from "./routes/teams";
 import TeamDetail from "./routes/team-detail";
@@ -28,7 +27,7 @@ const router = createBrowserRouter([
         path: "/",
         element: <Root />,
         children: [
-          { index: true, element: <Home /> },
+          { index: true, element: <Settings /> },
           { path: "users", element: <Users /> },
           { path: "users/:id", element: <UserDetail /> },
           { path: "teams", element: <Teams /> },

@@ -1,4 +1,4 @@
-# MPS — Manpower Planning System
+# MPS — MPS Planning System
 
 ## Quick Start
 
