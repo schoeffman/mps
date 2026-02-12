@@ -94,6 +94,7 @@ export const projects = pgTable("projects", {
     .references(() => users.id),
   status: text("status").notNull().default("Explore"),
   color: text("color").notNull().default("blue"),
+  projectType: text("project_type").notNull().default("Feature Development"),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

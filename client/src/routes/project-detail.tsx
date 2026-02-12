@@ -36,6 +36,8 @@ const GET_PROJECT = gql`
         fullName
       }
       status
+      color
+      projectType
       members {
         id
         fullName
@@ -58,6 +60,7 @@ const enumLabels: Record<string, string> = {
   ProductManagement: "Product Management",
   DataScience: "Data Science",
   NotApplicable: "Not Applicable",
+  FeatureDevelopment: "Feature Development",
 };
 
 function formatEnum(value: string) {
@@ -124,6 +127,7 @@ export default function ProjectDetail() {
 
       <div className="mb-6 text-sm text-muted-foreground space-y-1">
         <p>DRI: {project.dri.fullName}</p>
+        <p>Type: {formatEnum(project.projectType)}</p>
         <p>Status: {project.status}</p>
         <p>Target Date: {new Date(project.targetDate).toLocaleDateString()}</p>
         <p>Created: {new Date(project.createdAt).toLocaleDateString()}</p>

@@ -9,6 +9,7 @@ interface Project {
   dri: { id: number; fullName: string };
   status: string;
   color: string;
+  projectType: string;
   members: { id: number; fullName: string }[];
 }
 

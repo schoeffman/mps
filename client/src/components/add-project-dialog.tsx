@@ -34,6 +34,7 @@ const CREATE_PROJECT = gql`
       }
       status
       color
+      projectType
       members {
         id
         fullName
@@ -49,6 +50,7 @@ export function AddProjectDialog() {
   const [targetDate, setTargetDate] = useState("");
   const [status, setStatus] = useState("Explore");
   const [color, setColor] = useState("blue");
+  const [projectType, setProjectType] = useState("FeatureDevelopment");
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [driId, setDriId] = useState<string>("");
 
@@ -64,6 +66,7 @@ export function AddProjectDialog() {
     setTargetDate("");
     setStatus("Explore");
     setColor("blue");
+    setProjectType("FeatureDevelopment");
     setMemberIds([]);
     setDriId("");
   }
@@ -85,7 +88,7 @@ export function AddProjectDialog() {
     e.preventDefault();
     await createProject({
       variables: {
-        input: { name, targetDate, driId: Number(driId), status, color, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType, memberIds },
       },
     });
     resetForm();
@@ -135,6 +138,19 @@ export function AddProjectDialog() {
                 <SelectItem value="Explore">Explore</SelectItem>
                 <SelectItem value="Make">Make</SelectItem>
                 <SelectItem value="Complete">Complete</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="projectType">Type</Label>
+            <Select value={projectType} onValueChange={setProjectType}>
+              <SelectTrigger id="projectType">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FeatureDevelopment">Feature Development</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
           </div>

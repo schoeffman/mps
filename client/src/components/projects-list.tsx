@@ -18,6 +18,7 @@ interface Project {
   dri: { id: number; fullName: string };
   status: string;
   color: string;
+  projectType: string;
   members: { id: number; fullName: string }[];
   createdAt: string;
 }
@@ -44,6 +45,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>DRI</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Target Date</TableHead>
           <TableHead>Members</TableHead>
@@ -60,6 +62,11 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
               </Link>
             </TableCell>
             <TableCell>{project.dri.fullName}</TableCell>
+            <TableCell>
+              <Badge variant="secondary">
+                {project.projectType === "FeatureDevelopment" ? "Feature Development" : "Maintenance"}
+              </Badge>
+            </TableCell>
             <TableCell>
               <Badge variant={statusVariant[project.status] ?? "outline"}>
                 {project.status}

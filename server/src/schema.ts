@@ -112,6 +112,11 @@ export const typeDefs = gql`
     Complete
   }
 
+  enum ProjectType {
+    FeatureDevelopment
+    Maintenance
+  }
+
   type Project {
     id: Int!
     name: String!
@@ -119,6 +124,7 @@ export const typeDefs = gql`
     dri: User!
     status: ProjectStatus!
     color: String!
+    projectType: ProjectType!
     members: [User!]!
     createdAt: String!
   }
@@ -129,6 +135,7 @@ export const typeDefs = gql`
     driId: Int!
     status: ProjectStatus!
     color: String!
+    projectType: ProjectType
     memberIds: [Int!]!
   }
 
@@ -138,6 +145,7 @@ export const typeDefs = gql`
     driId: Int!
     status: ProjectStatus!
     color: String!
+    projectType: ProjectType!
     memberIds: [Int!]!
   }
 
@@ -290,6 +298,16 @@ const craftFocusFromDb: Record<string, string> = {
   "Not Applicable": "NotApplicable",
 };
 
+const projectTypeToDb: Record<string, string> = {
+  FeatureDevelopment: "Feature Development",
+  Maintenance: "Maintenance",
+};
+
+const projectTypeFromDb: Record<string, string> = {
+  "Feature Development": "FeatureDevelopment",
+  Maintenance: "Maintenance",
+};
+
 function mapUserFromDb(row: typeof users.$inferSelect) {
   return {
     ...row,
@@ -351,6 +369,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     dri: driRow ? mapUserFromDb(driRow) : null,
     status: projectRow.status,
     color: projectRow.color,
+    projectType: projectTypeFromDb[projectRow.projectType] ?? "FeatureDevelopment",
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     createdAt: projectRow.createdAt.toISOString(),
   };
@@ -640,7 +659,7 @@ export const resolvers = {
     },
     createProject: async (
       _: unknown,
-      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string; memberIds: number[] } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -657,6 +676,7 @@ export const resolvers = {
           driId: input.driId,
           status: input.status,
           color: input.color,
+          projectType: projectTypeToDb[input.projectType ?? "FeatureDevelopment"] ?? "Feature Development",
           ownerId,
         })
         .returning();
@@ -668,7 +688,7 @@ export const resolvers = {
     },
     updateProject: async (
       _: unknown,
-      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; memberIds: number[] } },
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string; memberIds: number[] } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -684,6 +704,7 @@ export const resolvers = {
           driId: input.driId,
           status: input.status,
           color: input.color,
+          projectType: projectTypeToDb[input.projectType] ?? "Feature Development",
         })
         .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
         .returning();

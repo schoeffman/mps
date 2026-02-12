@@ -35,6 +35,7 @@ const UPDATE_PROJECT = gql`
       }
       status
       color
+      projectType
       members {
         id
         fullName
@@ -52,6 +53,7 @@ interface EditProjectDialogProps {
     dri: { id: number; fullName: string };
     status: string;
     color: string;
+    projectType: string;
     members: { id: number; fullName: string }[];
   };
   trigger?: React.ReactNode;
@@ -63,6 +65,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
   const [targetDate, setTargetDate] = useState(project.targetDate);
   const [status, setStatus] = useState(project.status);
   const [color, setColor] = useState(project.color);
+  const [projectType, setProjectType] = useState(project.projectType);
   const [memberIds, setMemberIds] = useState<number[]>(project.members.map((m) => m.id));
   const [driId, setDriId] = useState<string>(String(project.dri.id));
 
@@ -78,6 +81,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setTargetDate(project.targetDate);
     setStatus(project.status);
     setColor(project.color);
+    setProjectType(project.projectType);
     setMemberIds(project.members.map((m) => m.id));
     setDriId(String(project.dri.id));
   }
@@ -106,7 +110,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, color, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType, memberIds },
       },
     });
     setOpen(false);
@@ -159,6 +163,19 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
                 <SelectItem value="Explore">Explore</SelectItem>
                 <SelectItem value="Make">Make</SelectItem>
                 <SelectItem value="Complete">Complete</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="edit-projectType">Type</Label>
+            <Select value={projectType} onValueChange={setProjectType}>
+              <SelectTrigger id="edit-projectType">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FeatureDevelopment">Feature Development</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
           </div>
