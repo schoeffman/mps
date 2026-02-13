@@ -36,6 +36,8 @@ server/              Express 4 + Apollo Server (GraphQL) + Drizzle ORM + node-po
 | `npm start` | Production start (serves built client from Express) |
 | `npm run db:push -w server` | Push Drizzle schema to DB (may hang on prompts — use psql instead) |
 | `npm run db:studio -w server` | Open Drizzle Studio |
+| `npm test` | Run all tests (Vitest, both workspaces) |
+| `npm run test:watch` | Run tests in watch mode |
 
 ## Architecture
 
@@ -59,6 +61,18 @@ On the client, `SpaceProvider` (wraps all authenticated routes) queries availabl
 ### GraphQL
 
 Single schema in `server/src/schema.ts` — types, resolvers, and helpers all in one file. No code generation. The client uses raw `gql` template strings with Apollo's `useQuery`/`useMutation`.
+
+## Testing
+
+Vitest runs from the project root across both workspaces (`npm test`). Tests target pure utility functions — no DB or network required.
+
+- `client/src/lib/schedule-utils.test.ts` — quarter ranges, week generation, holiday detection, formatting
+- `server/src/lib/merge-week-ranges.test.ts` — merging consecutive weekly assignments into date ranges
+- `server/src/lib/generate-date-range.test.ts` — inclusive date range generation
+
+Server has a minimal `server/vitest.config.ts` for NodeNext module resolution. The client needs no extra config.
+
+When adding new logic-heavy utilities, extract them as pure functions in `*/src/lib/` and add a corresponding `.test.ts` file.
 
 ## Important Patterns
 

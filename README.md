@@ -91,6 +91,25 @@ From the project root:
 | `npm run db:seed -w server` | Seed the database (requires `OWNER_ID` env var) |
 | `npm run db:reseed -w server` | Clear and reseed using the first auth user in the database |
 | `npm run db:studio -w server` | Open Drizzle Studio to browse the database |
+| `npm test` | Run all tests (Vitest) |
+| `npm run test:watch` | Run tests in watch mode |
+
+## Testing
+
+Tests use [Vitest](https://vitest.dev/) and run from the project root across both workspaces.
+
+```bash
+npm test            # single run
+npm run test:watch  # watch mode
+```
+
+Tests focus on pure utility functions extracted from resolvers:
+
+- `client/src/lib/schedule-utils.test.ts` — quarter ranges, week generation, holiday detection, formatting
+- `server/src/lib/merge-week-ranges.test.ts` — merging consecutive weekly assignments into date ranges
+- `server/src/lib/generate-date-range.test.ts` — inclusive date range generation
+
+No database or network connection is required to run tests.
 
 ## Features
 
