@@ -34,6 +34,10 @@ const GET_SCHEDULE = gql`
 
 const GET_SCHEDULE_DETAIL = gql`
   query GetScheduleDetail($scheduleId: Int!, $startDate: String!, $endDate: String!) {
+    users {
+      id
+      fullName
+    }
     teams {
       id
       name
@@ -103,14 +107,25 @@ export default function ScheduleDetail() {
     skip: !startDate || !endDate,
   });
 
+  const unassignedUsers = useMemo(() => {
+    if (!detailData) return [];
+    const teamMemberIds = new Set<number>();
+    for (const team of detailData.teams) {
+      for (const member of team.members) {
+        teamMemberIds.add(member.id);
+      }
+    }
+    return detailData.users.filter((u: { id: number }) => !teamMemberIds.has(u.id));
+  }, [detailData]);
+
   const totalSlots = useMemo(() => {
     if (!detailData || weekStarts.length === 0) return 0;
     const totalMembers = detailData.teams.reduce(
       (sum: number, t: { members: unknown[] }) => sum + t.members.length,
       0,
-    );
+    ) + unassignedUsers.length;
     return totalMembers * weekStarts.length;
-  }, [detailData, weekStarts]);
+  }, [detailData, weekStarts, unassignedUsers]);
 
   const availableCapacity = useMemo(() => {
     if (totalSlots === 0 || !detailData) return null;
@@ -191,6 +206,7 @@ export default function ScheduleDetail() {
             weekStarts={weekStarts}
             startDate={startDate}
             endDate={endDate}
+            unassignedUsers={unassignedUsers}
           />
           {totalSlots > 0 && (
             <ScheduleCapacityChart

@@ -15,10 +15,6 @@ export const GET_PROJECTS = gql`
       status
       color
       projectType
-      members {
-        id
-        fullName
-      }
       createdAt
     }
   }

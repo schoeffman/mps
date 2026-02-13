@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 
 const CREATE_PROJECT = gql`
   mutation CreateProject($input: CreateProjectInput!) {
@@ -35,10 +34,6 @@ const CREATE_PROJECT = gql`
       status
       color
       projectType
-      members {
-        id
-        fullName
-      }
       createdAt
     }
   }
@@ -51,7 +46,6 @@ export function AddProjectDialog() {
   const [status, setStatus] = useState("Explore");
   const [color, setColor] = useState("blue");
   const [projectType, setProjectType] = useState("FeatureDevelopment");
-  const [memberIds, setMemberIds] = useState<number[]>([]);
   const [driId, setDriId] = useState<string>("");
 
   const { data: usersData } = useQuery(GET_USERS);
@@ -67,35 +61,19 @@ export function AddProjectDialog() {
     setStatus("Explore");
     setColor("blue");
     setProjectType("FeatureDevelopment");
-    setMemberIds([]);
     setDriId("");
-  }
-
-  function toggleMember(userId: number) {
-    setMemberIds((prev) => {
-      const next = prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId];
-      // If unchecking the current DRI, clear DRI selection
-      if (!next.includes(Number(driId))) {
-        setDriId("");
-      }
-      return next;
-    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     await createProject({
       variables: {
-        input: { name, targetDate, driId: Number(driId), status, color, projectType, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType },
       },
     });
     resetForm();
     setOpen(false);
   }
-
-  const selectedMembers = allUsers.filter((u) => memberIds.includes(u.id));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -173,28 +151,13 @@ export function AddProjectDialog() {
           </div>
 
           <div className="grid gap-2">
-            <Label>Team Members</Label>
-            <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
-              {allUsers.map((user) => (
-                <label key={user.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={memberIds.includes(user.id)}
-                    onCheckedChange={() => toggleMember(user.id)}
-                  />
-                  {user.fullName}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-2">
             <Label htmlFor="dri">DRI (Directly Responsible Individual)</Label>
             <Select value={driId} onValueChange={setDriId}>
               <SelectTrigger id="dri">
                 <SelectValue placeholder="Select DRI" />
               </SelectTrigger>
               <SelectContent>
-                {selectedMembers.map((user) => (
+                {allUsers.map((user) => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.fullName}
                   </SelectItem>
@@ -205,7 +168,7 @@ export function AddProjectDialog() {
 
           <Button
             type="submit"
-            disabled={loading || !name || !targetDate || !driId || memberIds.length === 0}
+            disabled={loading || !name || !targetDate || !driId}
           >
             {loading ? "Creating..." : "Create Project"}
           </Button>

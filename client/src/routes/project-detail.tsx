@@ -4,7 +4,6 @@ import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
 import { ArrowLeft, Trash2, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import {
@@ -40,13 +39,6 @@ const GET_PROJECT = gql`
       status
       color
       projectType
-      members {
-        id
-        fullName
-        craftAbility
-        jobLevel
-        craftFocus
-      }
       links {
         id
         url
@@ -79,6 +71,23 @@ const REMOVE_PROJECT_LINK = gql`
   }
 `;
 
+const GET_PROJECT_ASSIGNMENTS = gql`
+  query GetProjectAssignments($projectId: Int!) {
+    projectAssignments(projectId: $projectId) {
+      user {
+        id
+        fullName
+      }
+      teamName
+      dateRanges {
+        start
+        end
+        scheduleName
+      }
+    }
+  }
+`;
+
 const enumLabels: Record<string, string> = {
   ProductManagement: "Product Management",
   DataScience: "Data Science",
@@ -88,6 +97,19 @@ const enumLabels: Record<string, string> = {
 
 function formatEnum(value: string) {
   return enumLabels[value] ?? value;
+}
+
+function formatDateRange(start: string, end: string) {
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  if (start === end) {
+    return s.toLocaleDateString(undefined, { ...opts, year: "numeric" });
+  }
+  if (s.getFullYear() === e.getFullYear()) {
+    return `${s.toLocaleDateString(undefined, opts)} – ${e.toLocaleDateString(undefined, { ...opts, year: "numeric" })}`;
+  }
+  return `${s.toLocaleDateString(undefined, { ...opts, year: "numeric" })} – ${e.toLocaleDateString(undefined, { ...opts, year: "numeric" })}`;
 }
 
 export default function ProjectDetail() {
@@ -105,6 +127,10 @@ export default function ProjectDetail() {
   });
   const [removeProjectLink] = useMutation(REMOVE_PROJECT_LINK, {
     refetchQueries: [{ query: GET_PROJECT, variables: { id: projectId } }],
+  });
+
+  const { data: assignmentsData } = useQuery(GET_PROJECT_ASSIGNMENTS, {
+    variables: { projectId },
   });
 
   const [linkUrl, setLinkUrl] = useState("");
@@ -176,35 +202,45 @@ export default function ProjectDetail() {
         <p>Created: {new Date(project.createdAt).toLocaleDateString()}</p>
       </div>
 
-      <h2 className="text-lg font-semibold mb-2">Team Members</h2>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Craft Ability</TableHead>
-            <TableHead>Job Level</TableHead>
-            <TableHead>Craft Focus</TableHead>
-            <TableHead>Role</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {project.members.map((member: { id: number; fullName: string; craftAbility: string; jobLevel: string; craftFocus: string }) => (
-            <TableRow key={member.id}>
-              <TableCell className="font-medium">{member.fullName}</TableCell>
-              <TableCell>{formatEnum(member.craftAbility)}</TableCell>
-              <TableCell>{member.jobLevel}</TableCell>
-              <TableCell>{formatEnum(member.craftFocus)}</TableCell>
-              <TableCell>
-                {member.id === project.dri.id ? (
-                  <Badge>DRI</Badge>
-                ) : (
-                  <Badge variant="secondary">Member</Badge>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {/* Team Members Section */}
+      <section className="mt-6">
+        <h2 className="text-lg font-semibold mb-2">Team Members</h2>
+        {assignmentsData?.projectAssignments?.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead>Schedule</TableHead>
+                <TableHead>Dates</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {assignmentsData.projectAssignments.flatMap(
+                (assignment: { user: { id: number; fullName: string }; teamName: string | null; dateRanges: { start: string; end: string; scheduleName: string }[] }) =>
+                  assignment.dateRanges.map((range, i) => (
+                    <TableRow key={`${assignment.user.id}-${i}`}>
+                      {i === 0 ? (
+                        <>
+                          <TableCell rowSpan={assignment.dateRanges.length} className="font-medium align-top">
+                            {assignment.user.fullName}
+                          </TableCell>
+                          <TableCell rowSpan={assignment.dateRanges.length} className="align-top text-muted-foreground">
+                            {assignment.teamName ?? "—"}
+                          </TableCell>
+                        </>
+                      ) : null}
+                      <TableCell>{range.scheduleName}</TableCell>
+                      <TableCell>{formatDateRange(range.start, range.end)}</TableCell>
+                    </TableRow>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-sm text-muted-foreground">No team members scheduled.</p>
+        )}
+      </section>
 
       {/* Links Section */}
       <section className="mt-6">

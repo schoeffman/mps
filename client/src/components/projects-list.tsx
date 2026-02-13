@@ -19,7 +19,6 @@ interface Project {
   status: string;
   color: string;
   projectType: string;
-  members: { id: number; fullName: string }[];
   createdAt: string;
 }
 
@@ -48,7 +47,6 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
           <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Target Date</TableHead>
-          <TableHead>Members</TableHead>
           <TableHead>Created</TableHead>
           <TableHead className="w-[80px]"></TableHead>
         </TableRow>
@@ -73,7 +71,6 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
               </Badge>
             </TableCell>
             <TableCell>{new Date(project.targetDate).toLocaleDateString()}</TableCell>
-            <TableCell>{project.members.length}</TableCell>
             <TableCell>{new Date(project.createdAt).toLocaleDateString()}</TableCell>
             <TableCell className="flex gap-1">
               <EditProjectDialog project={project} />

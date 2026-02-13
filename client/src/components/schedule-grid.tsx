@@ -46,6 +46,11 @@ interface Assignment {
   weekStart: string;
 }
 
+interface UnassignedUser {
+  id: number;
+  fullName: string;
+}
+
 interface ScheduleGridProps {
   scheduleId: number;
   teams: Team[];
@@ -54,10 +59,11 @@ interface ScheduleGridProps {
   weekStarts: string[];
   startDate: string;
   endDate: string;
+  unassignedUsers: UnassignedUser[];
 }
 
 
-export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, startDate, endDate }: ScheduleGridProps) {
+export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, startDate, endDate, unassignedUsers }: ScheduleGridProps) {
   const [setAssignment] = useMutation(SET_SCHEDULE_ASSIGNMENT, {
     refetchQueries: ["GetScheduleDetail"],
   });
@@ -324,6 +330,54 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                 ))}
               </>
             ))}
+            {unassignedUsers.length > 0 && (
+              <>
+                <tr key="team-unassigned">
+                  <td
+                    colSpan={weekStarts.length + 1}
+                    className="bg-muted/50 px-3 py-1.5 font-semibold text-muted-foreground border-b"
+                  >
+                    Unassigned
+                  </td>
+                </tr>
+                {unassignedUsers.map((member) => (
+                  <tr key={`member-${member.id}`} className="border-b">
+                    <td className="sticky left-0 z-10 bg-background px-3 py-1.5 border-r whitespace-nowrap">
+                      <RowProjectPicker
+                        memberName={member.fullName}
+                        projects={projects}
+                        projectChipColorMap={projectChipColorMap}
+                        onSelectProject={(projectId) => handleRowAssign(member.id, projectId)}
+                      />
+                    </td>
+                    {weekStarts.map((ws) => {
+                      const cellKey = `${member.id}-${ws}`;
+                      const isPainted = paintedCells.has(cellKey);
+                      const projectId = assignmentMap.get(cellKey) ?? null;
+                      const bgColor = projectId ? projectColorMap.get(projectId) ?? "" : "";
+                      return (
+                        <ScheduleCell
+                          key={ws}
+                          userId={member.id}
+                          weekStart={ws}
+                          projectId={projectId}
+                          projects={projects}
+                          bgColor={bgColor}
+                          onAssign={handleAssign}
+                          isPaintMode={isPaintMode}
+                          activeProjectId={activeProjectId}
+                          onPaintStart={handlePaintStart}
+                          onPaintEnter={handlePaintEnter}
+                          isPainted={isPainted}
+                          paintPreviewBg={paintPreviewBg}
+                          isCurrentWeek={ws === currentWeekStart}
+                        />
+                      );
+                    })}
+                  </tr>
+                ))}
+              </>
+            )}
           </tbody>
         </table>
       </div>

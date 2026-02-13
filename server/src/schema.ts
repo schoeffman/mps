@@ -143,7 +143,6 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType
-    memberIds: [Int!]!
   }
 
   input UpdateProjectInput {
@@ -153,7 +152,6 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
-    memberIds: [Int!]!
   }
 
   type Schedule {
@@ -225,6 +223,18 @@ export const typeDefs = gql`
     createdAt: String!
   }
 
+  type DateRange {
+    start: String!
+    end: String!
+    scheduleName: String!
+  }
+
+  type ProjectAssignment {
+    user: User!
+    teamName: String
+    dateRanges: [DateRange!]!
+  }
+
   type Query {
     hello: String
     users: [User!]!
@@ -239,6 +249,7 @@ export const typeDefs = gql`
     workHistory(date: String!): [WorkHistoryEntry!]!
     workHistoryDates(startDate: String!, endDate: String!): [String!]!
     workHistoryAdjacentDates(date: String!): WorkHistoryAdjacentDates!
+    projectAssignments(projectId: Int!): [ProjectAssignment!]!
     me: SessionInfo
     mySpaces: [Space!]!
     spaceMembers: [SpaceMember!]!
@@ -513,6 +524,80 @@ export const resolvers = {
         next: nextRow?.date ?? null,
       };
     },
+    projectAssignments: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      // Verify project ownership
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+
+      // Get all assignments for this project, joined with schedule and user info
+      const rows = await db
+        .select({
+          userId: scheduleAssignments.userId,
+          weekStart: scheduleAssignments.weekStart,
+          scheduleId: scheduleAssignments.scheduleId,
+          scheduleName: schedules.name,
+          user: users,
+        })
+        .from(scheduleAssignments)
+        .innerJoin(schedules, eq(scheduleAssignments.scheduleId, schedules.id))
+        .innerJoin(users, eq(scheduleAssignments.userId, users.id))
+        .where(eq(scheduleAssignments.projectId, projectId))
+        .orderBy(asc(users.fullName), asc(scheduleAssignments.weekStart));
+
+      if (rows.length === 0) return [];
+
+      // Group by userId, then by scheduleId, merge consecutive weeks into ranges
+      const byUser = new Map<number, { user: typeof users.$inferSelect; bySchedule: Map<number, { scheduleName: string; weeks: string[] }> }>();
+      for (const row of rows) {
+        if (!byUser.has(row.userId)) {
+          byUser.set(row.userId, { user: row.user, bySchedule: new Map() });
+        }
+        const userEntry = byUser.get(row.userId)!;
+        if (!userEntry.bySchedule.has(row.scheduleId)) {
+          userEntry.bySchedule.set(row.scheduleId, { scheduleName: row.scheduleName, weeks: [] });
+        }
+        userEntry.bySchedule.get(row.scheduleId)!.weeks.push(row.weekStart);
+      }
+
+      // Look up team names for all assigned users
+      const userIds = [...byUser.keys()];
+      const teamRows = await db
+        .select({ userId: teamMembers.userId, teamName: teams.name })
+        .from(teamMembers)
+        .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+        .where(inArray(teamMembers.userId, userIds));
+      const userTeamMap = new Map<number, string>();
+      for (const row of teamRows) {
+        userTeamMap.set(row.userId, row.teamName);
+      }
+
+      const results = [];
+      for (const [userId, { user: userRow, bySchedule }] of byUser) {
+        const dateRanges = [];
+        for (const [, { scheduleName, weeks }] of bySchedule) {
+          weeks.sort();
+          let rangeStart = weeks[0];
+          let rangeEnd = weeks[0];
+          for (let i = 1; i < weeks.length; i++) {
+            const prev = new Date(rangeEnd);
+            const curr = new Date(weeks[i]);
+            const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+            if (diffDays === 7) {
+              rangeEnd = weeks[i];
+            } else {
+              dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
+              rangeStart = weeks[i];
+              rangeEnd = weeks[i];
+            }
+          }
+          dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
+        }
+        results.push({ user: mapUserFromDb(userRow), teamName: userTeamMap.get(userId) ?? null, dateRanges });
+      }
+
+      return results;
+    },
     me: (_: unknown, __: unknown, context: Context) => {
       if (!context.session) return null;
       return {
@@ -670,14 +755,10 @@ export const resolvers = {
     },
     createProject: async (
       _: unknown,
-      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string; memberIds: number[] } },
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
-      // Ensure DRI is included in members
-      const allMemberIds = input.memberIds.includes(input.driId)
-        ? input.memberIds
-        : [...input.memberIds, input.driId];
 
       const [projectRow] = await db
         .insert(projects)
@@ -692,20 +773,18 @@ export const resolvers = {
         })
         .returning();
 
+      // Add DRI as sole member
       await db.insert(projectMembers)
-        .values(allMemberIds.map((userId) => ({ projectId: projectRow.id, userId })));
+        .values([{ projectId: projectRow.id, userId: input.driId }]);
 
       return mapProjectFromDb(projectRow);
     },
     updateProject: async (
       _: unknown,
-      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string; memberIds: number[] } },
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
-      const allMemberIds = input.memberIds.includes(input.driId)
-        ? input.memberIds
-        : [...input.memberIds, input.driId];
 
       const [projectRow] = await db
         .update(projects)
@@ -721,10 +800,11 @@ export const resolvers = {
         .returning();
       if (!projectRow) throw new Error("Project not found");
 
-      // Replace all memberships
-      await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
-      await db.insert(projectMembers)
-        .values(allMemberIds.map((userId) => ({ projectId: id, userId })));
+      // Ensure DRI is a member
+      const existingMembers = await db.select().from(projectMembers).where(eq(projectMembers.projectId, id));
+      if (!existingMembers.some((m) => m.userId === input.driId)) {
+        await db.insert(projectMembers).values([{ projectId: id, userId: input.driId }]);
+      }
 
       return mapProjectFromDb(projectRow);
     },

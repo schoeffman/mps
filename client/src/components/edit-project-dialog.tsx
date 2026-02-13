@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 
 const UPDATE_PROJECT = gql`
   mutation UpdateProject($id: Int!, $input: UpdateProjectInput!) {
@@ -36,10 +35,6 @@ const UPDATE_PROJECT = gql`
       status
       color
       projectType
-      members {
-        id
-        fullName
-      }
       createdAt
     }
   }
@@ -54,7 +49,6 @@ interface EditProjectDialogProps {
     status: string;
     color: string;
     projectType: string;
-    members: { id: number; fullName: string }[];
   };
   trigger?: React.ReactNode;
 }
@@ -66,7 +60,6 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
   const [status, setStatus] = useState(project.status);
   const [color, setColor] = useState(project.color);
   const [projectType, setProjectType] = useState(project.projectType);
-  const [memberIds, setMemberIds] = useState<number[]>(project.members.map((m) => m.id));
   const [driId, setDriId] = useState<string>(String(project.dri.id));
 
   const { data: usersData } = useQuery(GET_USERS);
@@ -82,7 +75,6 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setStatus(project.status);
     setColor(project.color);
     setProjectType(project.projectType);
-    setMemberIds(project.members.map((m) => m.id));
     setDriId(String(project.dri.id));
   }
 
@@ -93,30 +85,16 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setOpen(nextOpen);
   }
 
-  function toggleMember(userId: number) {
-    setMemberIds((prev) => {
-      const next = prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId];
-      if (!next.includes(Number(driId))) {
-        setDriId("");
-      }
-      return next;
-    });
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, color, projectType, memberIds },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType },
       },
     });
     setOpen(false);
   }
-
-  const selectedMembers = allUsers.filter((u) => memberIds.includes(u.id));
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -198,28 +176,13 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
           </div>
 
           <div className="grid gap-2">
-            <Label>Team Members</Label>
-            <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
-              {allUsers.map((user) => (
-                <label key={user.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={memberIds.includes(user.id)}
-                    onCheckedChange={() => toggleMember(user.id)}
-                  />
-                  {user.fullName}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-2">
             <Label htmlFor="edit-dri">DRI (Directly Responsible Individual)</Label>
             <Select value={driId} onValueChange={setDriId}>
               <SelectTrigger id="edit-dri">
                 <SelectValue placeholder="Select DRI" />
               </SelectTrigger>
               <SelectContent>
-                {selectedMembers.map((user) => (
+                {allUsers.map((user) => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.fullName}
                   </SelectItem>
@@ -230,7 +193,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
 
           <Button
             type="submit"
-            disabled={loading || !name || !targetDate || !driId || memberIds.length === 0}
+            disabled={loading || !name || !targetDate || !driId}
           >
             {loading ? "Saving..." : "Save"}
           </Button>
