@@ -28,6 +28,16 @@ interface ScheduleCapacityChartProps {
 
 const REMAINING_COLOR = "#e5e7eb"; // gray-200
 
+const PROJECT_TYPE_COLORS: Record<string, string> = {
+  FeatureDevelopment: "#3b82f6", // blue-500
+  Maintenance: "#f59e0b", // amber-500
+};
+
+const PROJECT_TYPE_LABELS: Record<string, string> = {
+  FeatureDevelopment: "Feature Development",
+  Maintenance: "Maintenance",
+};
+
 interface Slice {
   label: string;
   value: number;
@@ -108,6 +118,42 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
     return result;
   }, [projects, assignments, totalSlots]);
 
+  const typeSlices = useMemo(() => {
+    if (totalSlots === 0) return [];
+
+    const typeCounts = new Map<string, number>();
+    for (const a of assignments) {
+      const project = projectMap.get(a.projectId);
+      if (!project) continue;
+      const type = project.projectType;
+      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+    }
+
+    const result: Slice[] = [];
+    for (const [type, count] of typeCounts) {
+      result.push({
+        label: PROJECT_TYPE_LABELS[type] ?? type,
+        value: count,
+        percentage: Math.round((count / totalSlots) * 100),
+        color: PROJECT_TYPE_COLORS[type] ?? "#9ca3af",
+        projectId: null,
+      });
+    }
+
+    const remaining = totalSlots - assignments.length;
+    if (remaining > 0) {
+      result.push({
+        label: "Remaining capacity",
+        value: remaining,
+        percentage: Math.round((remaining / totalSlots) * 100),
+        color: REMAINING_COLOR,
+        projectId: null,
+      });
+    }
+
+    return result;
+  }, [assignments, projectMap, totalSlots]);
+
   if (slices.length === 0) return null;
 
   const cx = 80;
@@ -123,42 +169,80 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
     return { ...slice, d: describeArc(cx, cy, r, startAngle, endAngle) };
   });
 
-  return (
-    <div className="flex items-start gap-6 flex-wrap">
-      <svg width={160} height={160} viewBox="0 0 160 160" className="shrink-0">
-        {paths.map((p, i) => (
-          <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth={1.5} />
-        ))}
-      </svg>
-      <div className="flex flex-col gap-1.5 py-1">
-        {slices.map((s, i) => {
-          const project = s.projectId != null ? projectMap.get(s.projectId) : null;
+  let typeAngle = -Math.PI / 2;
+  const typePaths = typeSlices.map((slice) => {
+    const angle = (slice.value / totalSlots) * 2 * Math.PI;
+    const startAngle = typeAngle;
+    const endAngle = typeAngle + angle;
+    typeAngle = endAngle;
+    return { ...slice, d: describeArc(cx, cy, r, startAngle, endAngle) };
+  });
 
-          return (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <span
-                className="inline-block w-3 h-3 rounded-sm shrink-0"
-                style={{ backgroundColor: s.color }}
-              />
-              <span>
-                {project ? (
-                  <EditProjectDialog
-                    project={project}
-                    trigger={
-                      <button className="hover:underline cursor-pointer text-left">
-                        {s.label}
-                      </button>
-                    }
-                  />
-                ) : (
-                  s.label
-                )}{" "}
-                ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
-              </span>
-            </div>
-          );
-        })}
+  return (
+    <div className="flex items-start gap-10 flex-wrap">
+      {/* Per-project breakdown */}
+      <div className="flex items-start gap-4">
+        <svg width={160} height={160} viewBox="0 0 160 160" className="shrink-0">
+          {paths.map((p, i) => (
+            <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth={1.5} />
+          ))}
+        </svg>
+        <div className="flex flex-col gap-1.5 py-1">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">By Project</span>
+          {slices.map((s, i) => {
+            const project = s.projectId != null ? projectMap.get(s.projectId) : null;
+
+            return (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span
+                  className="inline-block w-3 h-3 rounded-sm shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span>
+                  {project ? (
+                    <EditProjectDialog
+                      project={project}
+                      trigger={
+                        <button className="hover:underline cursor-pointer text-left">
+                          {s.label}
+                        </button>
+                      }
+                    />
+                  ) : (
+                    s.label
+                  )}{" "}
+                  ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Project Type breakdown */}
+      {typeSlices.length > 0 && (
+        <div className="flex items-start gap-4">
+          <svg width={160} height={160} viewBox="0 0 160 160" className="shrink-0">
+            {typePaths.map((p, i) => (
+              <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth={1.5} />
+            ))}
+          </svg>
+          <div className="flex flex-col gap-1.5 py-1">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">By Type</span>
+            {typeSlices.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span
+                  className="inline-block w-3 h-3 rounded-sm shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span>
+                  {s.label} ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
