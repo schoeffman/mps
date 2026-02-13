@@ -2,6 +2,8 @@ import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers } from "./db/schema.js";
+import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
+import { generateDateRange } from "./lib/generate-date-range.js";
 
 export interface Context {
   session: {
@@ -576,25 +578,7 @@ export const resolvers = {
 
       const results = [];
       for (const [userId, { user: userRow, bySchedule }] of byUser) {
-        const dateRanges = [];
-        for (const [, { scheduleName, weeks }] of bySchedule) {
-          weeks.sort();
-          let rangeStart = weeks[0];
-          let rangeEnd = weeks[0];
-          for (let i = 1; i < weeks.length; i++) {
-            const prev = new Date(rangeEnd);
-            const curr = new Date(weeks[i]);
-            const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-            if (diffDays === 7) {
-              rangeEnd = weeks[i];
-            } else {
-              dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
-              rangeStart = weeks[i];
-              rangeEnd = weeks[i];
-            }
-          }
-          dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
-        }
+        const dateRanges = mergeWeekRanges(bySchedule);
         results.push({ user: mapUserFromDb(userRow), teamName: userTeamMap.get(userId) ?? null, dateRanges });
       }
 
@@ -971,16 +955,7 @@ export const resolvers = {
       if (!projectRow) throw new Error("Project not found");
 
       // Generate all dates in the range
-      const dates: string[] = [];
-      const current = new Date(startDate + "T00:00:00");
-      const end = new Date(endDate + "T00:00:00");
-      while (current <= end) {
-        const y = current.getFullYear();
-        const m = String(current.getMonth() + 1).padStart(2, "0");
-        const d = String(current.getDate()).padStart(2, "0");
-        dates.push(`${y}-${m}-${d}`);
-        current.setDate(current.getDate() + 1);
-      }
+      const dates = generateDateRange(startDate, endDate);
 
       const results = [];
       for (const date of dates) {
