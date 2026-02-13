@@ -12,7 +12,7 @@ export function SpaceSwitcher() {
 
   // Single space — no dropdown needed
   if (spaces.length <= 1) {
-    return <span className="text-lg font-semibold px-2">MPS</span>;
+    return null;
   }
 
   return (
