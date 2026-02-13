@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { gql, useMutation } from "@apollo/client";
-import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
+import { formatWeekHeader, getHolidaysInWeek, isCurrentWeek } from "@/lib/schedule-utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Flag } from "lucide-react";
 import { getProjectColor } from "@/lib/project-colors";
@@ -190,6 +190,11 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Find the week column that contains today's date
+  const currentWeekStart = useMemo(() => {
+    return weekStarts.find((ws) => isCurrentWeek(ws)) ?? null;
+  }, [weekStarts]);
+
   const handleChipClick = (id: number | "eraser") => {
     if (activeProjectId === id) {
       handleSave();
@@ -242,8 +247,9 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                 </th>
                 {weekStarts.map((ws) => {
                   const holidays = getHolidaysInWeek(ws);
+                  const isCurrent = ws === currentWeekStart;
                   return (
-                    <th key={ws} className="sticky top-0 z-10 bg-muted px-2 py-2 text-center font-medium min-w-[130px] border-b border-r">
+                    <th key={ws} className={`sticky top-0 z-10 px-2 py-2 text-center font-medium min-w-[130px] border-b border-r ${isCurrent ? "bg-blue-100 dark:bg-blue-950/40 border-x-2 border-x-blue-400 dark:border-x-blue-500" : "bg-muted"}`}>
                       {formatWeekHeader(ws)}
                       {holidays.length > 0 && (
                         <Tooltip>
@@ -310,6 +316,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                           onPaintEnter={handlePaintEnter}
                           isPainted={isPainted}
                           paintPreviewBg={paintPreviewBg}
+                          isCurrentWeek={ws === currentWeekStart}
                         />
                       );
                     })}

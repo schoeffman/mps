@@ -26,6 +26,7 @@ interface ScheduleCellProps {
   onPaintEnter?: (userId: number, weekStart: string) => void;
   isPainted?: boolean;
   paintPreviewBg?: string;
+  isCurrentWeek?: boolean;
 }
 
 export function ScheduleCell({
@@ -41,6 +42,7 @@ export function ScheduleCell({
   onPaintEnter,
   isPainted,
   paintPreviewBg,
+  isCurrentWeek,
 }: ScheduleCellProps) {
   const handleChange = (value: string) => {
     if (value === NONE_VALUE) {
@@ -62,7 +64,7 @@ export function ScheduleCell({
 
     return (
       <td
-        className={`border-r p-0.5 cursor-pointer select-none hover:ring-2 hover:ring-inset hover:ring-primary/50 ${displayBg} ${isPainted && !isErasing ? "ring-2 ring-inset ring-primary/40" : ""}`}
+        className={`border-r p-0.5 cursor-pointer select-none hover:ring-2 hover:ring-inset hover:ring-primary/50 ${displayBg} ${isPainted && !isErasing ? "ring-2 ring-inset ring-primary/40" : ""} ${isCurrentWeek ? "border-x-2 border-x-blue-400 dark:border-x-blue-500" : ""}`}
         onMouseDown={(e) => {
           e.preventDefault();
           onPaintStart?.(userId, weekStart);
@@ -79,7 +81,7 @@ export function ScheduleCell({
   }
 
   return (
-    <td className={`border-r p-0.5 ${bgColor}`}>
+    <td className={`border-r p-0.5 ${bgColor} ${isCurrentWeek ? "border-x-2 border-x-blue-400 dark:border-x-blue-500" : ""}`}>
       <Select value={projectId ? String(projectId) : NONE_VALUE} onValueChange={handleChange}>
         <SelectTrigger size="sm" className="border-0 shadow-none bg-transparent w-full h-7 text-xs">
           <SelectValue placeholder="—" />

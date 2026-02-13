@@ -52,6 +52,18 @@ export function getWeekStarts(startDate: string, endDate: string): string[] {
 }
 
 /**
+ * Check if today's date falls within the Mon–Sun week starting at weekStart.
+ */
+export function isCurrentWeek(weekStart: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(weekStart + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return today >= start && today <= end;
+}
+
+/**
  * Format a week start date for column headers, e.g. "Jan 5"
  */
 export function formatWeekHeader(weekStart: string): string {
