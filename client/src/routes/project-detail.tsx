@@ -131,6 +131,7 @@ export default function ProjectDetail() {
 
   const { data: assignmentsData } = useQuery(GET_PROJECT_ASSIGNMENTS, {
     variables: { projectId },
+    fetchPolicy: "cache-and-network",
   });
 
   const [linkUrl, setLinkUrl] = useState("");
