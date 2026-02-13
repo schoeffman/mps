@@ -1,8 +1,16 @@
 import { useState, useMemo, createContext, useContext } from "react";
-import { useQuery, gql } from "@apollo/client";
+import { useQuery, useMutation, gql } from "@apollo/client";
+import { Link } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipTrigger,
@@ -11,6 +19,8 @@ import {
 } from "@/components/ui/tooltip";
 import { getProjectColor } from "@/lib/project-colors";
 import { EditWorkHistoryDialog } from "@/components/edit-work-history-dialog";
+import { GET_USERS } from "@/routes/users";
+import { GET_PROJECTS } from "@/routes/projects";
 
 const GET_WORK_HISTORY = gql`
   query GetWorkHistory($date: String!) {
@@ -43,6 +53,25 @@ const GET_WORK_HISTORY_ADJACENT = gql`
 const GET_WORK_HISTORY_DATES = gql`
   query GetWorkHistoryDates($startDate: String!, $endDate: String!) {
     workHistoryDates(startDate: $startDate, endDate: $endDate)
+  }
+`;
+
+const ADD_WORK_HISTORY_ENTRY = gql`
+  mutation AddWorkHistoryEntry($userId: Int!, $projectId: Int!, $date: String!) {
+    addWorkHistoryEntry(userId: $userId, projectId: $projectId, date: $date) {
+      id
+      date
+      user {
+        id
+        fullName
+      }
+      project {
+        id
+        name
+        color
+      }
+      scheduleName
+    }
   }
 `;
 
@@ -188,10 +217,31 @@ function DayDetail({
   const { data: adjData } = useQuery(GET_WORK_HISTORY_ADJACENT, {
     variables: { date },
   });
+  const { data: usersData } = useQuery(GET_USERS);
+  const { data: projectsData } = useQuery(GET_PROJECTS);
+  const [addEntry, { loading: adding }] = useMutation(ADD_WORK_HISTORY_ENTRY, {
+    refetchQueries: ["GetWorkHistory", "GetWorkHistoryDates", "GetWorkHistoryAdjacentDates"],
+  });
+
+  const [addUserId, setAddUserId] = useState<string>("");
+  const [addProjectId, setAddProjectId] = useState<string>("");
+
+  const allUsers: { id: number; fullName: string }[] = usersData?.users ?? [];
+  const allProjects: { id: number; name: string }[] = projectsData?.projects ?? [];
 
   const entries = data?.workHistory ?? [];
   const prevDate = adjData?.workHistoryAdjacentDates?.previous ?? null;
   const nextDate = adjData?.workHistoryAdjacentDates?.next ?? null;
+
+  async function handleAddEntry(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addUserId || !addProjectId) return;
+    await addEntry({
+      variables: { userId: Number(addUserId), projectId: Number(addProjectId), date },
+    });
+    setAddUserId("");
+    setAddProjectId("");
+  }
 
   return (
     <div className="mt-4">
@@ -282,11 +332,13 @@ function DayDetail({
                   <tr key={entry.id} className="border-b last:border-b-0">
                     <td className="px-4 py-2">{entry.user.fullName}</td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${color.chipBg}`}
-                      >
-                        {entry.project.name}
-                      </span>
+                      <Link to={`/projects/${entry.project.id}`}>
+                        <span
+                          className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium hover:opacity-80 transition-opacity ${color.chipBg}`}
+                        >
+                          {entry.project.name}
+                        </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">
                       {entry.scheduleName}
@@ -301,6 +353,42 @@ function DayDetail({
           </table>
         </div>
       )}
+
+      <form onSubmit={handleAddEntry} className="mt-4 flex items-end gap-3">
+        <div className="grid gap-1.5">
+          <label className="text-sm font-medium">User</label>
+          <Select value={addUserId} onValueChange={setAddUserId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select user" />
+            </SelectTrigger>
+            <SelectContent>
+              {allUsers.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <label className="text-sm font-medium">Project</label>
+          <Select value={addProjectId} onValueChange={setAddProjectId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              {allProjects.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" variant="outline" disabled={adding || !addUserId || !addProjectId}>
+          {adding ? "Adding..." : "Add Entry"}
+        </Button>
+      </form>
     </div>
   );
 }

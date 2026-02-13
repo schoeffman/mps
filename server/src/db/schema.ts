@@ -150,7 +150,7 @@ export const workHistory = pgTable("work_history", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   projectId: integer("project_id").notNull().references(() => projects.id),
-  scheduleId: integer("schedule_id").notNull().references(() => schedules.id),
+  scheduleId: integer("schedule_id").references(() => schedules.id),
   date: text("date").notNull(),
   manuallyEdited: boolean("manually_edited").notNull().default(false),
   ownerId: text("owner_id").notNull().references(() => authUser.id),

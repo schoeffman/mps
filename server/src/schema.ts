@@ -277,6 +277,7 @@ export const typeDefs = gql`
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
     updateWorkHistoryEntry(id: Int!, projectId: Int!): WorkHistoryEntry!
+    addWorkHistoryEntry(userId: Int!, projectId: Int!, date: String!): WorkHistoryEntry!
     addProjectLink(projectId: Int!, url: String!): ProjectLink!
     removeProjectLink(id: Int!): Boolean!
     linkAuthUser(appUserId: Int!): Boolean!
@@ -953,6 +954,31 @@ export const resolvers = {
         date: row.date,
         user: userRow ? mapUserFromDb(userRow) : null,
         project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
+        scheduleName: "Manually Entered",
+      };
+    },
+    addWorkHistoryEntry: async (
+      _: unknown,
+      { userId, projectId, date }: { userId: number; projectId: number; date: string },
+      context: Context,
+    ) => {
+      const ownerId = getOwnerId(context);
+      // Verify user and project ownership
+      const [userRow] = await db.select().from(users).where(and(eq(users.id, userId), eq(users.ownerId, ownerId)));
+      if (!userRow) throw new Error("User not found");
+      const [projectRow] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!projectRow) throw new Error("Project not found");
+
+      const [row] = await db
+        .insert(workHistory)
+        .values({ userId, projectId, date, manuallyEdited: true, ownerId })
+        .returning();
+
+      return {
+        id: row.id,
+        date: row.date,
+        user: mapUserFromDb(userRow),
+        project: { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] },
         scheduleName: "Manually Entered",
       };
     },
