@@ -1,9 +1,10 @@
 import { useState, useMemo, createContext, useContext } from "react";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,13 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { getProjectColor } from "@/lib/project-colors";
 import { EditWorkHistoryDialog } from "@/components/edit-work-history-dialog";
 import { GET_USERS } from "@/routes/users";
@@ -56,9 +64,9 @@ const GET_WORK_HISTORY_DATES = gql`
   }
 `;
 
-const ADD_WORK_HISTORY_ENTRY = gql`
-  mutation AddWorkHistoryEntry($userId: Int!, $projectId: Int!, $date: String!) {
-    addWorkHistoryEntry(userId: $userId, projectId: $projectId, date: $date) {
+const ADD_WORK_HISTORY_ENTRIES = gql`
+  mutation AddWorkHistoryEntries($userId: Int!, $projectId: Int!, $startDate: String!, $endDate: String!) {
+    addWorkHistoryEntries(userId: $userId, projectId: $projectId, startDate: $startDate, endDate: $endDate) {
       id
       date
       user {
@@ -72,6 +80,12 @@ const ADD_WORK_HISTORY_ENTRY = gql`
       }
       scheduleName
     }
+  }
+`;
+
+const DELETE_WORK_HISTORY_ENTRY = gql`
+  mutation DeleteWorkHistoryEntry($id: Int!) {
+    deleteWorkHistoryEntry(id: $id)
   }
 `;
 
@@ -153,7 +167,24 @@ export default function WorkHistory() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Work History</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Work History</h1>
+        {!selectedDate && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Update Work History</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Work History</DialogTitle>
+              </DialogHeader>
+              <div className="py-2">
+                <AddWorkHistoryForm />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
 
       {selectedDate ? (
         <DayDetail
@@ -202,6 +233,98 @@ export default function WorkHistory() {
   );
 }
 
+function AddWorkHistoryForm({ defaultDate }: { defaultDate?: string }) {
+  const yesterday = toISO(new Date(Date.now() - 86400000));
+  const initial = defaultDate && defaultDate <= yesterday ? defaultDate : yesterday;
+
+  const [addUserId, setAddUserId] = useState<string>("");
+  const [addProjectId, setAddProjectId] = useState<string>("");
+  const [addStartDate, setAddStartDate] = useState(initial);
+  const [addEndDate, setAddEndDate] = useState(initial);
+
+  const { data: usersData } = useQuery(GET_USERS);
+  const { data: projectsData } = useQuery(GET_PROJECTS);
+  const [addEntries, { loading: adding }] = useMutation(ADD_WORK_HISTORY_ENTRIES, {
+    refetchQueries: ["GetWorkHistory", "GetWorkHistoryDates", "GetWorkHistoryAdjacentDates"],
+  });
+
+  const allUsers: { id: number; fullName: string }[] = usersData?.users ?? [];
+  const allProjects: { id: number; name: string }[] = projectsData?.projects ?? [];
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!addUserId || !addProjectId || !addStartDate || !addEndDate) return;
+    await addEntries({
+      variables: { userId: Number(addUserId), projectId: Number(addProjectId), startDate: addStartDate, endDate: addEndDate },
+    });
+    setAddUserId("");
+    setAddProjectId("");
+    setAddStartDate(initial);
+    setAddEndDate(initial);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-end gap-3 flex-wrap">
+      <div className="grid gap-1.5">
+        <label className="text-sm font-medium">User</label>
+        <Select value={addUserId} onValueChange={setAddUserId}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select user" />
+          </SelectTrigger>
+          <SelectContent>
+            {allUsers.map((u) => (
+              <SelectItem key={u.id} value={String(u.id)}>
+                {u.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-1.5">
+        <label className="text-sm font-medium">Project</label>
+        <Select value={addProjectId} onValueChange={setAddProjectId}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select project" />
+          </SelectTrigger>
+          <SelectContent>
+            {allProjects.map((p) => (
+              <SelectItem key={p.id} value={String(p.id)}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-1.5">
+        <label className="text-sm font-medium">Start Date</label>
+        <Input
+          type="date"
+          value={addStartDate}
+          onChange={(e) => setAddStartDate(e.target.value)}
+          max={addEndDate}
+          className="w-[160px]"
+          required
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <label className="text-sm font-medium">End Date</label>
+        <Input
+          type="date"
+          value={addEndDate}
+          onChange={(e) => setAddEndDate(e.target.value)}
+          min={addStartDate}
+          max={yesterday}
+          className="w-[160px]"
+          required
+        />
+      </div>
+      <Button type="submit" variant="outline" disabled={adding || !addUserId || !addProjectId || !addStartDate || !addEndDate}>
+        {adding ? "Adding..." : "Add Entries"}
+      </Button>
+    </form>
+  );
+}
+
 function DayDetail({
   date,
   onBack,
@@ -217,31 +340,13 @@ function DayDetail({
   const { data: adjData } = useQuery(GET_WORK_HISTORY_ADJACENT, {
     variables: { date },
   });
-  const { data: usersData } = useQuery(GET_USERS);
-  const { data: projectsData } = useQuery(GET_PROJECTS);
-  const [addEntry, { loading: adding }] = useMutation(ADD_WORK_HISTORY_ENTRY, {
+  const [deleteEntry] = useMutation(DELETE_WORK_HISTORY_ENTRY, {
     refetchQueries: ["GetWorkHistory", "GetWorkHistoryDates", "GetWorkHistoryAdjacentDates"],
   });
-
-  const [addUserId, setAddUserId] = useState<string>("");
-  const [addProjectId, setAddProjectId] = useState<string>("");
-
-  const allUsers: { id: number; fullName: string }[] = usersData?.users ?? [];
-  const allProjects: { id: number; name: string }[] = projectsData?.projects ?? [];
 
   const entries = data?.workHistory ?? [];
   const prevDate = adjData?.workHistoryAdjacentDates?.previous ?? null;
   const nextDate = adjData?.workHistoryAdjacentDates?.next ?? null;
-
-  async function handleAddEntry(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addUserId || !addProjectId) return;
-    await addEntry({
-      variables: { userId: Number(addUserId), projectId: Number(addProjectId), date },
-    });
-    setAddUserId("");
-    setAddProjectId("");
-  }
 
   return (
     <div className="mt-4">
@@ -344,7 +449,16 @@ function DayDetail({
                       {entry.scheduleName}
                     </td>
                     <td className="px-2 py-2">
-                      <EditWorkHistoryDialog entry={entry} />
+                      <div className="flex gap-1">
+                        <EditWorkHistoryDialog entry={entry} />
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => deleteEntry({ variables: { id: entry.id } })}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -354,41 +468,9 @@ function DayDetail({
         </div>
       )}
 
-      <form onSubmit={handleAddEntry} className="mt-4 flex items-end gap-3">
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium">User</label>
-          <Select value={addUserId} onValueChange={setAddUserId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select user" />
-            </SelectTrigger>
-            <SelectContent>
-              {allUsers.map((u) => (
-                <SelectItem key={u.id} value={String(u.id)}>
-                  {u.fullName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium">Project</label>
-          <Select value={addProjectId} onValueChange={setAddProjectId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              {allProjects.map((p) => (
-                <SelectItem key={p.id} value={String(p.id)}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button type="submit" variant="outline" disabled={adding || !addUserId || !addProjectId}>
-          {adding ? "Adding..." : "Add Entry"}
-        </Button>
-      </form>
+      <div className="mt-4">
+        <AddWorkHistoryForm defaultDate={date} />
+      </div>
     </div>
   );
 }

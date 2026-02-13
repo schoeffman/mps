@@ -277,7 +277,8 @@ export const typeDefs = gql`
     setScheduleAssignment(scheduleId: Int!, userId: Int!, weekStart: String!, projectId: Int): ScheduleAssignment
     bulkSetScheduleAssignments(scheduleId: Int!, assignments: [BulkAssignmentInput!]!): Boolean!
     updateWorkHistoryEntry(id: Int!, projectId: Int!): WorkHistoryEntry!
-    addWorkHistoryEntry(userId: Int!, projectId: Int!, date: String!): WorkHistoryEntry!
+    addWorkHistoryEntries(userId: Int!, projectId: Int!, startDate: String!, endDate: String!): [WorkHistoryEntry!]!
+    deleteWorkHistoryEntry(id: Int!): Boolean!
     addProjectLink(projectId: Int!, url: String!): ProjectLink!
     removeProjectLink(id: Int!): Boolean!
     linkAuthUser(appUserId: Int!): Boolean!
@@ -957,9 +958,9 @@ export const resolvers = {
         scheduleName: "Manually Entered",
       };
     },
-    addWorkHistoryEntry: async (
+    addWorkHistoryEntries: async (
       _: unknown,
-      { userId, projectId, date }: { userId: number; projectId: number; date: string },
+      { userId, projectId, startDate, endDate }: { userId: number; projectId: number; startDate: string; endDate: string },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -969,18 +970,43 @@ export const resolvers = {
       const [projectRow] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
       if (!projectRow) throw new Error("Project not found");
 
-      const [row] = await db
-        .insert(workHistory)
-        .values({ userId, projectId, date, manuallyEdited: true, ownerId })
-        .returning();
+      // Generate all dates in the range
+      const dates: string[] = [];
+      const current = new Date(startDate + "T00:00:00");
+      const end = new Date(endDate + "T00:00:00");
+      while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, "0");
+        const d = String(current.getDate()).padStart(2, "0");
+        dates.push(`${y}-${m}-${d}`);
+        current.setDate(current.getDate() + 1);
+      }
 
-      return {
-        id: row.id,
-        date: row.date,
-        user: mapUserFromDb(userRow),
-        project: { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] },
-        scheduleName: "Manually Entered",
-      };
+      const results = [];
+      for (const date of dates) {
+        const [row] = await db
+          .insert(workHistory)
+          .values({ userId, projectId, date, manuallyEdited: true, ownerId })
+          .onConflictDoUpdate({
+            target: [workHistory.userId, workHistory.date],
+            set: { projectId, manuallyEdited: true, scheduleId: null },
+          })
+          .returning();
+        results.push({
+          id: row.id,
+          date: row.date,
+          user: mapUserFromDb(userRow),
+          project: { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] },
+          scheduleName: "Manually Entered",
+        });
+      }
+
+      return results;
+    },
+    deleteWorkHistoryEntry: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(workHistory).where(and(eq(workHistory.id, id), eq(workHistory.ownerId, ownerId))).returning();
+      return deleted.length > 0;
     },
     addProjectLink: async (_: unknown, { projectId, url }: { projectId: number; url: string }, context: Context) => {
       const ownerId = getOwnerId(context);

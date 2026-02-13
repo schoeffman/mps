@@ -155,7 +155,7 @@ export const workHistory = pgTable("work_history", {
   manuallyEdited: boolean("manually_edited").notNull().default(false),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => [unique().on(table.userId, table.date, table.scheduleId)]);
+}, (table) => [unique().on(table.userId, table.date)]);
 
 export const spaceMembers = pgTable("space_members", {
   id: serial("id").primaryKey(),
