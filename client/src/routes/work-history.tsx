@@ -151,11 +151,7 @@ export default function WorkHistory() {
                 modifiers={{
                   noData: (date) => {
                     if (!datesCtx.loaded) return false;
-                    return (
-                      date.getMonth() === month.getMonth() &&
-                      date.getFullYear() === month.getFullYear() &&
-                      !datesCtx.dates.has(toISO(date))
-                    );
+                    return !datesCtx.dates.has(toISO(date));
                   },
                 }}
                 modifiersClassNames={{
