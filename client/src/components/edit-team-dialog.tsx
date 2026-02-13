@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, gql } from "@apollo/client";
 import { Pencil } from "lucide-react";
 import { GET_TEAMS } from "@/routes/teams";
@@ -56,11 +56,25 @@ export function EditTeamDialog({ team }: EditTeamDialogProps) {
   const [teamLeadId, setTeamLeadId] = useState<string>(String(team.teamLead.id));
 
   const { data: usersData } = useQuery(GET_USERS);
+  const { data: teamsData } = useQuery(GET_TEAMS);
   const [updateTeam, { loading }] = useMutation(UPDATE_TEAM, {
     refetchQueries: [{ query: GET_TEAMS }],
   });
 
   const allUsers: { id: number; fullName: string }[] = usersData?.users ?? [];
+
+  // Map userId → team name for users on OTHER teams
+  const takenByTeam = useMemo(() => {
+    const map = new Map<number, string>();
+    if (!teamsData?.teams) return map;
+    for (const t of teamsData.teams) {
+      if (t.id === team.id) continue;
+      for (const m of t.members) {
+        map.set(m.id, t.name);
+      }
+    }
+    return map;
+  }, [teamsData, team.id]);
 
   function resetForm() {
     setName(team.name);
@@ -125,15 +139,20 @@ export function EditTeamDialog({ team }: EditTeamDialogProps) {
           <div className="grid gap-2">
             <Label>Members</Label>
             <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
-              {allUsers.map((user) => (
-                <label key={user.id} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={memberIds.includes(user.id)}
-                    onCheckedChange={() => toggleMember(user.id)}
-                  />
-                  {user.fullName}
-                </label>
-              ))}
+              {allUsers.map((user) => {
+                const otherTeam = takenByTeam.get(user.id);
+                return (
+                  <label key={user.id} className={`flex items-center gap-2 text-sm ${otherTeam ? "opacity-50" : ""}`}>
+                    <Checkbox
+                      checked={memberIds.includes(user.id)}
+                      onCheckedChange={() => toggleMember(user.id)}
+                      disabled={!!otherTeam}
+                    />
+                    {user.fullName}
+                    {otherTeam && <span className="text-xs text-muted-foreground">({otherTeam})</span>}
+                  </label>
+                );
+              })}
             </div>
           </div>
 
