@@ -158,8 +158,8 @@ export default function ProjectDetail() {
 
   const [linkUrl, setLinkUrl] = useState("");
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
-  const [jiraSortCol, setJiraSortCol] = useState<string>("key");
-  const [jiraSortAsc, setJiraSortAsc] = useState(true);
+  const [jiraSortCol, setJiraSortCol] = useState<string>("status");
+  const [jiraSortAsc, setJiraSortAsc] = useState(false);
   const resizeRef = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
   const colRatios = [0.15, 0.50, 0.175, 0.175];
 
