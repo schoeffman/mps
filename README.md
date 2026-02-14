@@ -118,7 +118,43 @@ No database or network connection is required to run tests.
 - **Projects** — track projects with DRI, status, target date, and color coding
 - **Schedules** — quarterly schedule grids showing weekly user/project assignments
 - **Work History** — daily snapshots of schedule assignments with a date picker for browsing past records (cron job runs at 11 PM daily)
+- **Jira Integration** — link projects to Jira Cloud to view issues (key, summary, status, assignee) directly on the project detail page
 - **Auth** — Google (and Apple) social login via Better Auth with per-user data isolation
+
+## Jira Integration
+
+You can optionally connect a Jira Cloud instance to view issues on project pages.
+
+### Setup
+
+1. **Generate a Jira API token:**
+   - Go to [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+   - Click **Create API token**, give it a label, and copy the generated token
+
+2. **Configure in MPS:**
+   - Open **Settings** in the app
+   - In the **Jira Integration** section, enter your Jira domain (e.g. `mycompany` for `mycompany.atlassian.net`), the email associated with your Jira account, and the API token
+   - Click **Save Jira Config**
+
+3. **Link a project:**
+   - Edit any project and enter its **Jira Project Key** (e.g. `MPS`, `INFRA`)
+   - The project detail page will display a **Jira Issues** table with links back to Jira
+
+### Schema migration
+
+If upgrading an existing database, run:
+
+```sql
+CREATE TABLE jira_config (
+  id SERIAL PRIMARY KEY,
+  owner_id TEXT NOT NULL UNIQUE REFERENCES "user"(id),
+  domain TEXT NOT NULL,
+  email TEXT NOT NULL,
+  api_token TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+ALTER TABLE projects ADD COLUMN jira_project_key TEXT;
+```
 
 ## Tech stack
 

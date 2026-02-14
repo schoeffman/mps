@@ -58,6 +58,10 @@ On the client, `SpaceProvider` (wraps all authenticated routes) queries availabl
 - Server: session extracted in Apollo context function, `requireAuth()` guard on mutations
 - Client: `ProtectedRoute` redirects to `/login` if no session
 
+### Jira Integration
+
+Optional per-owner Jira Cloud integration. Credentials stored in `jira_config` table (domain, email, API token). Projects can have a nullable `jira_project_key` column. The server proxies all Jira API calls (`server/src/lib/jira-client.ts`) so credentials never reach the client. Settings page has a "Jira Integration" section (owner-only) for managing config. Edit project dialog shows a "Jira Project Key" field when config exists. Project detail page shows a "Jira Issues" table when a project has a linked key.
+
 ### GraphQL
 
 Single schema in `server/src/schema.ts` — types, resolvers, and helpers all in one file. No code generation. The client uses raw `gql` template strings with Apollo's `useQuery`/`useMutation`.
