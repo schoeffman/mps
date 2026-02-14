@@ -198,7 +198,7 @@ export default function ProjectDetail() {
   }, [jiraColWidths]);
 
   const hasJiraKey = data?.project?.jiraProjectKey;
-  const { data: jiraConfigData } = useQuery(JIRA_CONFIG_FOR_PROJECT, { skip: !hasJiraKey });
+  const { data: jiraConfigData, loading: jiraConfigLoading } = useQuery(JIRA_CONFIG_FOR_PROJECT);
   const { data: jiraIssuesData, loading: jiraLoading, error: jiraError } = useQuery(GET_JIRA_ISSUES, {
     variables: { projectId },
     skip: !hasJiraKey,
@@ -359,9 +359,20 @@ export default function ProjectDetail() {
       </section>
 
       {/* Jira Issues Section */}
-      {project.jiraProjectKey && (
         <section className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Jira Issues</h2>
+          {!jiraConfigLoading && !jiraConfigData?.jiraConfig ? (
+            <p className="text-sm text-muted-foreground">
+              Jira integration is not configured. Set it up in{" "}
+              <Link to="/settings" className="text-primary hover:underline">Settings</Link>{" "}
+              to link Jira issues to your projects.
+            </p>
+          ) : !project.jiraProjectKey ? (
+            <p className="text-sm text-muted-foreground">
+              No Jira epic key linked to this project. Click the edit button above to add a Jira project or epic key.
+            </p>
+          ) : (
+          <>
           {jiraIssuesData?.jiraIssues?.length > 0 && (() => {
             const counts: Record<string, { count: number; color: string }> = {};
             for (const issue of jiraIssuesData.jiraIssues) {
@@ -498,8 +509,9 @@ export default function ProjectDetail() {
           ) : (
             <p className="text-sm text-muted-foreground">No issues found.</p>
           )}
+          </>
+          )}
         </section>
-      )}
     </>
   );
 }
