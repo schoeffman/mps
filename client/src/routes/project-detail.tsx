@@ -372,7 +372,7 @@ export default function ProjectDetail() {
             <Table style={{ tableLayout: "fixed", width: jiraColWidths.reduce((a, b) => a + b, 0) }}>
               <TableHeader>
                 <TableRow>
-                  {[{ label: "Key", field: "key" }, { label: "Summary", field: "summary" }, { label: "Status", field: "status" }, { label: "Assignee", field: "assignee" }].map((col, i) => (
+                  {[{ label: "Key", field: "key" }, { label: "Title", field: "summary" }, { label: "Status", field: "status" }, { label: "Assignee", field: "assignee" }].map((col, i) => (
                     <TableHead
                       key={col.field}
                       style={{ width: jiraColWidths![i], position: "relative", cursor: "pointer", userSelect: "none" }}
@@ -433,7 +433,20 @@ export default function ProjectDetail() {
                         issue.key
                       )}
                     </TableCell>
-                    <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">{issue.summary}</TableCell>
+                    <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">
+                      {jiraConfigData?.jiraConfig?.domain ? (
+                        <a
+                          href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {issue.summary}
+                        </a>
+                      ) : (
+                        issue.summary
+                      )}
+                    </TableCell>
                     <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
                         <span
