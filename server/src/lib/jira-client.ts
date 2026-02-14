@@ -28,7 +28,7 @@ export async function fetchJiraIssues(
       jql: projectKey.includes("-")
         ? `parent=${projectKey} ORDER BY created DESC`
         : `project=${projectKey} ORDER BY created DESC`,
-      maxResults: 50,
+      maxResults: 250,
       fields: ["summary", "status", "assignee"],
     }),
   });
