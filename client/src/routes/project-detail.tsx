@@ -5,6 +5,13 @@ import { GET_PROJECTS } from "@/routes/projects";
 import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import {
   AlertDialog,
@@ -157,6 +164,7 @@ export default function ProjectDetail() {
   });
 
   const [linkUrl, setLinkUrl] = useState("");
+  const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null } | null>(null);
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
   const [jiraSortCol, setJiraSortCol] = useState<string>("status");
   const [jiraSortAsc, setJiraSortAsc] = useState(false);
@@ -509,32 +517,33 @@ export default function ProjectDetail() {
                   .map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
                   <TableRow key={issue.key}>
                     <TableCell className="font-medium overflow-hidden text-ellipsis whitespace-nowrap">
-                      {jiraConfigData?.jiraConfig?.domain ? (
-                        <a
-                          href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
+                      <span className="inline-flex items-center gap-1.5">
+                        {jiraConfigData?.jiraConfig?.domain && (
+                          <a
+                            href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        )}
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => setSelectedIssue(issue)}
                         >
                           {issue.key}
-                        </a>
-                      ) : (
-                        issue.key
-                      )}
+                        </span>
+                      </span>
                     </TableCell>
                     <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">
-                      {jiraConfigData?.jiraConfig?.domain ? (
-                        <a
-                          href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {issue.summary}
-                        </a>
-                      ) : (
-                        issue.summary
-                      )}
+                      <span
+                        className="cursor-pointer hover:underline"
+                        onClick={() => setSelectedIssue(issue)}
+                      >
+                        {issue.summary}
+                      </span>
                     </TableCell>
                     <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
@@ -558,6 +567,49 @@ export default function ProjectDetail() {
           </>
           )}
         </section>
+
+      {/* Jira Issue Detail Panel */}
+      <Sheet open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{selectedIssue?.key}</SheetTitle>
+            <SheetDescription className="sr-only">Jira issue details</SheetDescription>
+          </SheetHeader>
+          {selectedIssue && (
+            <div className="px-4 space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Summary</p>
+                <p className="text-sm">{selectedIssue.summary}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: jiraStatusColor(selectedIssue.statusColor, selectedIssue.status) }}
+                  />
+                  {selectedIssue.status}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Assignee</p>
+                <p className="text-sm">{selectedIssue.assignee ?? "Unassigned"}</p>
+              </div>
+              {jiraConfigData?.jiraConfig?.domain && (
+                <a
+                  href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${selectedIssue.key}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="size-3.5" />
+                  Open in Jira
+                </a>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
