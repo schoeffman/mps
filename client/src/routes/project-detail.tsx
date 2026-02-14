@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
@@ -199,9 +199,12 @@ export default function ProjectDetail() {
 
   const hasJiraKey = data?.project?.jiraProjectKey;
   const { data: jiraConfigData, loading: jiraConfigLoading } = useQuery(JIRA_CONFIG_FOR_PROJECT);
-  const { data: jiraIssuesData, loading: jiraLoading, error: jiraError } = useQuery(GET_JIRA_ISSUES, {
+  const { data: jiraIssuesData, loading: jiraLoading, error: jiraError, refetch: refetchJiraIssues } = useQuery(GET_JIRA_ISSUES, {
     variables: { projectId },
     skip: !hasJiraKey,
+    fetchPolicy: "cache-and-network",
+    nextFetchPolicy: "cache-first",
+    pollInterval: 300000,
   });
 
   if (loading) return <p>Loading...</p>;
@@ -360,7 +363,14 @@ export default function ProjectDetail() {
 
       {/* Jira Issues Section */}
         <section className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">Jira Issues</h2>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-lg font-semibold">Jira Issues</h2>
+            {hasJiraKey && (
+              <Button variant="ghost" size="icon-xs" onClick={() => refetchJiraIssues()} title="Refresh Jira issues">
+                <RefreshCw className={jiraLoading ? "animate-spin" : ""} />
+              </Button>
+            )}
+          </div>
           {!jiraConfigLoading && !jiraConfigData?.jiraConfig ? (
             <p className="text-sm text-muted-foreground">
               Jira integration is not configured. Set it up in{" "}
