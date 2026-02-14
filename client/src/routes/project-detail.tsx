@@ -224,7 +224,9 @@ export default function ProjectDetail() {
                       {i === 0 ? (
                         <>
                           <TableCell rowSpan={assignment.dateRanges.length} className="font-medium align-top">
-                            {assignment.user.fullName}
+                            <Link to={`/users/${assignment.user.id}`} className="hover:underline">
+                              {assignment.user.fullName}
+                            </Link>
                           </TableCell>
                           <TableCell rowSpan={assignment.dateRanges.length} className="align-top text-muted-foreground">
                             {assignment.teamName ?? "—"}
