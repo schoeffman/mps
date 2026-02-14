@@ -19,7 +19,7 @@ interface Project {
   status: string;
   color: string;
   projectType: string;
-  createdAt: string;
+  jiraProjectKey: string | null;
 }
 
 const statusVariant: Record<string, "default" | "secondary" | "outline"> = {
@@ -47,7 +47,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
           <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Target Date</TableHead>
-          <TableHead>Created</TableHead>
+          <TableHead>Project Key</TableHead>
           <TableHead className="w-[80px]"></TableHead>
         </TableRow>
       </TableHeader>
@@ -71,7 +71,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
               </Badge>
             </TableCell>
             <TableCell>{new Date(project.targetDate).toLocaleDateString()}</TableCell>
-            <TableCell>{new Date(project.createdAt).toLocaleDateString()}</TableCell>
+            <TableCell className="text-muted-foreground">{project.jiraProjectKey ?? "—"}</TableCell>
             <TableCell className="flex gap-1">
               <EditProjectDialog project={project} />
               <DeleteProjectButton projectId={project.id} projectName={project.name} />

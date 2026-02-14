@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2, X, ExternalLink } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
@@ -158,6 +158,8 @@ export default function ProjectDetail() {
 
   const [linkUrl, setLinkUrl] = useState("");
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
+  const [jiraSortCol, setJiraSortCol] = useState<string>("key");
+  const [jiraSortAsc, setJiraSortAsc] = useState(true);
   const resizeRef = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
   const colRatios = [0.15, 0.50, 0.175, 0.175];
 
@@ -370,11 +372,27 @@ export default function ProjectDetail() {
             <Table style={{ tableLayout: "fixed", width: jiraColWidths.reduce((a, b) => a + b, 0) }}>
               <TableHeader>
                 <TableRow>
-                  {["Key", "Summary", "Status", "Assignee"].map((label, i) => (
-                    <TableHead key={label} style={{ width: jiraColWidths![i], position: "relative" }}>
-                      {label}
+                  {[{ label: "Key", field: "key" }, { label: "Summary", field: "summary" }, { label: "Status", field: "status" }, { label: "Assignee", field: "assignee" }].map((col, i) => (
+                    <TableHead
+                      key={col.field}
+                      style={{ width: jiraColWidths![i], position: "relative", cursor: "pointer", userSelect: "none" }}
+                      onClick={() => {
+                        if (jiraSortCol === col.field) {
+                          setJiraSortAsc(prev => !prev);
+                        } else {
+                          setJiraSortCol(col.field);
+                          setJiraSortAsc(true);
+                        }
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {jiraSortCol === col.field && (
+                          jiraSortAsc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+                        )}
+                      </span>
                       <div
-                        onMouseDown={(e) => onResizeStart(i, e)}
+                        onMouseDown={(e) => { e.stopPropagation(); onResizeStart(i, e); }}
                         style={{
                           position: "absolute",
                           right: 0,
@@ -391,7 +409,15 @@ export default function ProjectDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jiraIssuesData.jiraIssues.map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
+                {[...jiraIssuesData.jiraIssues]
+                  .sort((a: Record<string, string | null>, b: Record<string, string | null>) => {
+                    const av = (a[jiraSortCol] ?? "").toLowerCase();
+                    const bv = (b[jiraSortCol] ?? "").toLowerCase();
+                    if (av < bv) return jiraSortAsc ? -1 : 1;
+                    if (av > bv) return jiraSortAsc ? 1 : -1;
+                    return 0;
+                  })
+                  .map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
                   <TableRow key={issue.key}>
                     <TableCell className="font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                       {jiraConfigData?.jiraConfig?.domain ? (

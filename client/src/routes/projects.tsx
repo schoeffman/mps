@@ -15,7 +15,7 @@ export const GET_PROJECTS = gql`
       status
       color
       projectType
-      createdAt
+      jiraProjectKey
     }
   }
 `;
