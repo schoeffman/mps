@@ -150,6 +150,7 @@ export const typeDefs = gql`
   type JiraIssue {
     key: String!
     summary: String!
+    description: String
     status: String!
     statusColor: String!
     assignee: String

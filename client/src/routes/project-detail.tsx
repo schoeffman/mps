@@ -13,6 +13,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
+import { AdfRenderer } from "@/components/adf-renderer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +94,7 @@ const GET_JIRA_ISSUES = gql`
     jiraIssues(projectId: $projectId) {
       key
       summary
+      description
       status
       statusColor
       assignee
@@ -611,15 +613,22 @@ export default function ProjectDetail() {
       <Sheet open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>{selectedIssue?.key}</SheetTitle>
+            <SheetTitle className="pr-8">{selectedIssue?.summary}</SheetTitle>
             <SheetDescription className="sr-only">Jira issue details</SheetDescription>
+              {jiraConfigData?.jiraConfig?.domain && selectedIssue && (
+                <a
+                  href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${selectedIssue.key}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="size-3.5" />
+                  {selectedIssue.key}
+                </a>
+              )}
           </SheetHeader>
           {selectedIssue && (
             <div className="px-4 space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Summary</p>
-                <p className="text-sm">{selectedIssue.summary}</p>
-              </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Status</p>
                 <span className="inline-flex items-center gap-1.5 text-sm">
@@ -656,16 +665,11 @@ export default function ProjectDetail() {
                 <p className="text-xs text-muted-foreground mb-1">Assignee</p>
                 <p className="text-sm">{selectedIssue.assignee ?? "Unassigned"}</p>
               </div>
-              {jiraConfigData?.jiraConfig?.domain && (
-                <a
-                  href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${selectedIssue.key}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="size-3.5" />
-                  Open in Jira
-                </a>
+              {selectedIssue.description && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Description</p>
+                  <AdfRenderer document={selectedIssue.description} />
+                </div>
               )}
             </div>
           )}

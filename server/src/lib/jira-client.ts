@@ -1,6 +1,7 @@
 export interface JiraIssue {
   key: string;
   summary: string;
+  description: string | null;
   status: string;
   statusColor: string;
   assignee: string | null;
@@ -94,7 +95,7 @@ export async function fetchJiraIssues(
         ? `parent=${projectKey} ORDER BY created DESC`
         : `project=${projectKey} ORDER BY created DESC`,
       maxResults: 250,
-      fields: ["summary", "status", "assignee"],
+      fields: ["summary", "status", "assignee", "description"],
     }),
   });
 
@@ -109,12 +110,14 @@ export async function fetchJiraIssues(
     key: string;
     fields: {
       summary: string;
+      description: unknown;
       status: { name: string; statusCategory: { colorName: string } };
       assignee: { displayName: string } | null;
     };
   }) => ({
     key: issue.key,
     summary: issue.fields.summary,
+    description: issue.fields.description ? JSON.stringify(issue.fields.description) : null,
     status: issue.fields.status.name,
     statusColor: issue.fields.status.statusCategory.colorName,
     assignee: issue.fields.assignee?.displayName ?? null,
