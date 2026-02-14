@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, gql } from "@apollo/client";
+import { useQuery, useLazyQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
 import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,22 @@ const TRANSITION_JIRA_ISSUE = gql`
   }
 `;
 
+const SEARCH_JIRA_USERS = gql`
+  query SearchJiraUsers($query: String!) {
+    searchJiraUsers(query: $query) {
+      accountId
+      displayName
+      emailAddress
+    }
+  }
+`;
+
+const ASSIGN_JIRA_ISSUE = gql`
+  mutation AssignJiraIssue($issueKey: String!, $accountId: String) {
+    assignJiraIssue(issueKey: $issueKey, accountId: $accountId)
+  }
+`;
+
 const GET_PROJECT_ASSIGNMENTS = gql`
   query GetProjectAssignments($projectId: Int!) {
     projectAssignments(projectId: $projectId) {
@@ -183,6 +199,8 @@ export default function ProjectDetail() {
   const [linkUrl, setLinkUrl] = useState("");
   const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState("");
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
   const [jiraSortCol, setJiraSortCol] = useState<string>("status");
   const [jiraSortAsc, setJiraSortAsc] = useState(false);
@@ -240,6 +258,24 @@ export default function ProjectDetail() {
   });
 
   const [transitionJiraIssue] = useMutation(TRANSITION_JIRA_ISSUE);
+  const [searchUsers, { data: usersData, loading: usersLoading }] = useLazyQuery(SEARCH_JIRA_USERS, { fetchPolicy: "network-only" });
+  const [assignJiraIssue] = useMutation(ASSIGN_JIRA_ISSUE);
+
+  async function handleAssign(accountId: string | null) {
+    if (!selectedIssue) return;
+    setAssigning(true);
+    try {
+      await assignJiraIssue({ variables: { issueKey: selectedIssue.key, accountId } });
+      const { data: refreshed } = await refetchJiraIssues();
+      const updated = refreshed?.jiraIssues?.find((i: { key: string }) => i.key === selectedIssue.key);
+      if (updated) setSelectedIssue(updated);
+      setAssigneeSearch("");
+    } catch (err) {
+      console.error("Assign failed:", err);
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   async function handleTransition(transitionId: string) {
     if (!selectedIssue) return;
@@ -663,7 +699,65 @@ export default function ProjectDetail() {
               )}
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Assignee</p>
-                <p className="text-sm">{selectedIssue.assignee ?? "Unassigned"}</p>
+                <p className="text-sm">
+                  {assigning ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Loader2 className="size-3 animate-spin" />
+                      Updating...
+                    </span>
+                  ) : (
+                    selectedIssue.assignee ?? "Unassigned"
+                  )}
+                </p>
+                <details>
+                  <summary className="text-xs text-muted-foreground cursor-pointer select-none mt-1">Choose new assignee</summary>
+                  <Input
+                    type="text"
+                    placeholder="Search users..."
+                    value={assigneeSearch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAssigneeSearch(val);
+                      if (val.length >= 2) {
+                        searchUsers({ variables: { query: val } });
+                      }
+                    }}
+                    className="mt-2 h-8 text-sm"
+                  />
+                  {assigneeSearch.length >= 2 && (
+                    <div className="mt-1 border rounded-md max-h-40 overflow-y-auto">
+                      {usersLoading ? (
+                        <p className="text-xs text-muted-foreground p-2">Searching...</p>
+                      ) : usersData?.searchJiraUsers?.length > 0 ? (
+                        usersData.searchJiraUsers.map((u: { accountId: string; displayName: string; emailAddress: string | null }) => (
+                          <button
+                            key={u.accountId}
+                            type="button"
+                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                            disabled={assigning}
+                            onClick={() => handleAssign(u.accountId)}
+                          >
+                            <span>{u.displayName}</span>
+                            {u.emailAddress && (
+                              <span className="text-xs text-muted-foreground ml-2">{u.emailAddress}</span>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground p-2">No users found</p>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    disabled={!selectedIssue.assignee || assigning}
+                    onClick={() => handleAssign(null)}
+                  >
+                    Unassign
+                  </Button>
+                </details>
               </div>
               {selectedIssue.description && (
                 <div>
