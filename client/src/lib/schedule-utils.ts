@@ -119,7 +119,7 @@ function observed(d: Date): Date {
   return d;
 }
 
-function getUSHolidays(year: number): { date: Date; name: string }[] {
+export function getUSHolidays(year: number): { date: Date; name: string }[] {
   return [
     { date: observed(new Date(year, 0, 1)), name: "New Year's Day" },
     { date: nthWeekday(year, 0, 1, 3), name: "MLK Day" },

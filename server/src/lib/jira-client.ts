@@ -5,6 +5,7 @@ export interface JiraIssue {
   status: string;
   statusColor: string;
   assignee: string | null;
+  storyPoints: number | null;
 }
 
 export interface JiraUser {
@@ -83,11 +84,15 @@ export async function fetchJiraIssues(
   email: string,
   apiToken: string,
   projectKey: string,
+  storyPointsFieldId: string | null,
 ): Promise<JiraIssue[]> {
   const baseUrl = `https://${domain}.atlassian.net`;
   const url = `${baseUrl}/rest/api/3/search/jql`;
 
   const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
+
+  const fields = ["summary", "status", "assignee", "description"];
+  if (storyPointsFieldId) fields.push(storyPointsFieldId);
 
   const response = await fetch(url, {
     method: "POST",
@@ -101,7 +106,7 @@ export async function fetchJiraIssues(
         ? `parent=${projectKey} ORDER BY created DESC`
         : `project=${projectKey} ORDER BY created DESC`,
       maxResults: 250,
-      fields: ["summary", "status", "assignee", "description"],
+      fields,
     }),
   });
 
@@ -119,6 +124,7 @@ export async function fetchJiraIssues(
       description: unknown;
       status: { name: string; statusCategory: { colorName: string } };
       assignee: { displayName: string } | null;
+      [key: string]: unknown;
     };
   }) => ({
     key: issue.key,
@@ -127,6 +133,7 @@ export async function fetchJiraIssues(
     status: issue.fields.status.name,
     statusColor: issue.fields.status.statusCategory.colorName,
     assignee: issue.fields.assignee?.displayName ?? null,
+    storyPoints: storyPointsFieldId ? (issue.fields[storyPointsFieldId] as number | null) ?? null : null,
   }));
 }
 

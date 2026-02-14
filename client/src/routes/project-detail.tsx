@@ -100,6 +100,7 @@ const GET_JIRA_ISSUES = gql`
       status
       statusColor
       assignee
+      storyPoints
     }
   }
 `;
@@ -199,7 +200,7 @@ export default function ProjectDetail() {
   });
 
   const [linkUrl, setLinkUrl] = useState("");
-  const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null } | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null; storyPoints: number | null } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState("");
@@ -208,7 +209,7 @@ export default function ProjectDetail() {
   const [jiraSortAsc, setJiraSortAsc] = useState(false);
   const [showGantt, setShowGantt] = useState(false);
   const resizeRef = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
-  const colRatios = [0.15, 0.50, 0.175, 0.175];
+  const colRatios = [0.12, 0.46, 0.15, 0.15, 0.07];
 
   const jiraTableRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || jiraColWidths) return;
@@ -617,7 +618,7 @@ export default function ProjectDetail() {
             <Table style={{ tableLayout: "fixed", width: jiraColWidths.reduce((a, b) => a + b, 0) }}>
               <TableHeader>
                 <TableRow>
-                  {[{ label: "Key", field: "key" }, { label: "Title", field: "summary" }, { label: "Status", field: "status" }, { label: "Assignee", field: "assignee" }].map((col, i) => (
+                  {[{ label: "Key", field: "key" }, { label: "Title", field: "summary" }, { label: "Status", field: "status" }, { label: "Assignee", field: "assignee" }, { label: "SP", field: "storyPoints" }].map((col, i) => (
                     <TableHead
                       key={col.field}
                       style={{ width: jiraColWidths![i], position: "relative", cursor: "pointer", userSelect: "none" }}
@@ -655,14 +656,19 @@ export default function ProjectDetail() {
               </TableHeader>
               <TableBody>
                 {[...jiraIssuesData.jiraIssues]
-                  .sort((a: Record<string, string | null>, b: Record<string, string | null>) => {
-                    const av = (a[jiraSortCol] ?? "").toLowerCase();
-                    const bv = (b[jiraSortCol] ?? "").toLowerCase();
+                  .sort((a: Record<string, string | number | null>, b: Record<string, string | number | null>) => {
+                    if (jiraSortCol === "storyPoints") {
+                      const av = (a[jiraSortCol] as number | null) ?? -1;
+                      const bv = (b[jiraSortCol] as number | null) ?? -1;
+                      return jiraSortAsc ? av - bv : bv - av;
+                    }
+                    const av = (String(a[jiraSortCol] ?? "")).toLowerCase();
+                    const bv = (String(b[jiraSortCol] ?? "")).toLowerCase();
                     if (av < bv) return jiraSortAsc ? -1 : 1;
                     if (av > bv) return jiraSortAsc ? 1 : -1;
                     return 0;
                   })
-                  .map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
+                  .map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null; storyPoints: number | null }) => (
                   <TableRow key={issue.key}>
                     <TableCell className="font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
@@ -703,6 +709,7 @@ export default function ProjectDetail() {
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{issue.assignee ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-center overflow-hidden text-ellipsis whitespace-nowrap">{issue.storyPoints ?? "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -768,6 +775,10 @@ export default function ProjectDetail() {
                   </div>
                 </details>
               )}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Story Points</p>
+                <p className="text-sm">{selectedIssue.storyPoints ?? "—"}</p>
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Assignee</p>
                 <p className="text-sm">

@@ -28,17 +28,19 @@ const JIRA_CONFIG = gql`
       domain
       email
       hasToken
+      storyPointsFieldId
     }
   }
 `;
 
 const SAVE_JIRA_CONFIG = gql`
-  mutation SaveJiraConfig($domain: String!, $email: String!, $apiToken: String!) {
-    saveJiraConfig(domain: $domain, email: $email, apiToken: $apiToken) {
+  mutation SaveJiraConfig($domain: String!, $email: String!, $apiToken: String!, $storyPointsFieldId: String) {
+    saveJiraConfig(domain: $domain, email: $email, apiToken: $apiToken, storyPointsFieldId: $storyPointsFieldId) {
       id
       domain
       email
       hasToken
+      storyPointsFieldId
     }
   }
 `;
@@ -103,6 +105,7 @@ export default function Settings() {
   const [jiraDomain, setJiraDomain] = useState("");
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraToken, setJiraToken] = useState("");
+  const [jiraStoryPointsFieldId, setJiraStoryPointsFieldId] = useState("");
   const [jiraError, setJiraError] = useState("");
 
   const { data: membersData, refetch: refetchMembers } = useQuery(SPACE_MEMBERS, { skip: !isOwner });
@@ -158,7 +161,7 @@ export default function Settings() {
     e.preventDefault();
     setJiraError("");
     try {
-      await saveJiraConfig({ variables: { domain: jiraDomain.trim(), email: jiraEmail.trim(), apiToken: jiraToken.trim() } });
+      await saveJiraConfig({ variables: { domain: jiraDomain.trim(), email: jiraEmail.trim(), apiToken: jiraToken.trim(), storyPointsFieldId: jiraStoryPointsFieldId.trim() || null } });
       setJiraToken("");
       refetchJira();
     } catch (err: unknown) {
@@ -172,6 +175,7 @@ export default function Settings() {
       setJiraDomain("");
       setJiraEmail("");
       setJiraToken("");
+      setJiraStoryPointsFieldId("");
       refetchJira();
     } catch {
       alert("Failed to remove Jira config.");
@@ -230,6 +234,7 @@ export default function Settings() {
                 <p className="text-sm"><span className="font-medium">Domain:</span> {jiraData.jiraConfig.domain}.atlassian.net</p>
                 <p className="text-sm"><span className="font-medium">Email:</span> {jiraData.jiraConfig.email}</p>
                 <p className="text-sm"><span className="font-medium">API Token:</span> ••••••••</p>
+                <p className="text-sm"><span className="font-medium">Story Points Field:</span> {jiraData.jiraConfig.storyPointsFieldId || "Not configured"}</p>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -239,6 +244,7 @@ export default function Settings() {
                     setJiraDomain(jiraData.jiraConfig.domain);
                     setJiraEmail(jiraData.jiraConfig.email);
                     setJiraToken("");
+                    setJiraStoryPointsFieldId(jiraData.jiraConfig.storyPointsFieldId ?? "");
                   }}
                 >
                   Update
@@ -263,6 +269,11 @@ export default function Settings() {
                   <div className="grid gap-2">
                     <label className="text-sm font-medium" htmlFor="jira-token">API Token</label>
                     <Input id="jira-token" type="password" placeholder="Enter new API token" value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} required className="max-w-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="jira-sp-field">Story Points Field ID</label>
+                    <Input id="jira-sp-field" placeholder="customfield_33062" value={jiraStoryPointsFieldId} onChange={(e) => setJiraStoryPointsFieldId(e.target.value)} className="max-w-sm" />
+                    <p className="text-xs text-muted-foreground">Optional. The custom field ID used for story points in your Jira instance.</p>
                   </div>
                   {jiraError && <p className="text-sm text-destructive">{jiraError}</p>}
                   <Button type="submit" disabled={savingJira} size="sm">
@@ -290,6 +301,11 @@ export default function Settings() {
               <div className="grid gap-2">
                 <label className="text-sm font-medium" htmlFor="jira-token">API Token</label>
                 <Input id="jira-token" type="password" placeholder="Jira API token" value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} required className="max-w-sm" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor="jira-sp-field">Story Points Field ID</label>
+                <Input id="jira-sp-field" placeholder="customfield_33062" value={jiraStoryPointsFieldId} onChange={(e) => setJiraStoryPointsFieldId(e.target.value)} className="max-w-sm" />
+                <p className="text-xs text-muted-foreground">Optional. The custom field ID used for story points in your Jira instance.</p>
               </div>
               {jiraError && <p className="text-sm text-destructive">{jiraError}</p>}
               <Button type="submit" disabled={savingJira}>

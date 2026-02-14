@@ -104,6 +104,7 @@ describe("scheduleIssues", () => {
   it("handles gaps between date ranges", () => {
     const issues = [makeIssue("PROJ-1"), makeIssue("PROJ-2")];
     // First range: Jan 6-8 (Mon-Wed, exactly 3 days), then gap, then Jan 20+
+    // Jan 20 2025 is MLK Day, so second task starts Jan 21
     const assignments = [
       makeAssignment("Alice", [
         { start: "2025-01-06", end: "2025-01-08" },
@@ -113,7 +114,7 @@ describe("scheduleIssues", () => {
     const result = scheduleIssues(issues, assignments);
     expect(result.scheduled).toHaveLength(2);
     expect(result.scheduled[0].end).toBe("2025-01-08");
-    expect(result.scheduled[1].start).toBe("2025-01-20");
+    expect(result.scheduled[1].start).toBe("2025-01-21");
   });
 
   it("marks excess issues as unscheduled", () => {

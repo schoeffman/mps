@@ -171,5 +171,6 @@ export const jiraConfig = pgTable("jira_config", {
   domain: text("domain").notNull(),
   email: text("email").notNull(),
   apiToken: text("api_token").notNull(),
+  storyPointsFieldId: text("story_points_field_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -145,6 +145,7 @@ export const typeDefs = gql`
     domain: String!
     email: String!
     hasToken: Boolean!
+    storyPointsFieldId: String
   }
 
   type JiraIssue {
@@ -154,6 +155,7 @@ export const typeDefs = gql`
     status: String!
     statusColor: String!
     assignee: String
+    storyPoints: Float
   }
 
   type JiraTransition {
@@ -321,7 +323,7 @@ export const typeDefs = gql`
     linkAuthUser(appUserId: Int!): Boolean!
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
-    saveJiraConfig(domain: String!, email: String!, apiToken: String!): JiraConfig!
+    saveJiraConfig(domain: String!, email: String!, apiToken: String!, storyPointsFieldId: String): JiraConfig!
     removeJiraConfig: Boolean!
     transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
     assignJiraIssue(issueKey: String!, accountId: String): Boolean!
@@ -670,7 +672,7 @@ export const resolvers = {
       const ownerId = getOwnerId(context);
       const [row] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
       if (!row) return null;
-      return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+      return { id: row.id, domain: row.domain, email: row.email, hasToken: true, storyPointsFieldId: row.storyPointsFieldId ?? null };
     },
     jiraIssues: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
       const ownerId = getOwnerId(context);
@@ -679,7 +681,7 @@ export const resolvers = {
       if (!project.jiraProjectKey) return [];
       const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
       if (!config) throw new Error("Jira is not configured");
-      return fetchJiraIssues(config.domain, config.email, config.apiToken, project.jiraProjectKey);
+      return fetchJiraIssues(config.domain, config.email, config.apiToken, project.jiraProjectKey, config.storyPointsFieldId ?? null);
     },
     jiraTransitions: async (_: unknown, { issueKey }: { issueKey: string }, context: Context) => {
       const ownerId = getOwnerId(context);
@@ -1085,7 +1087,7 @@ export const resolvers = {
     },
     saveJiraConfig: async (
       _: unknown,
-      { domain, email, apiToken }: { domain: string; email: string; apiToken: string },
+      { domain, email, apiToken, storyPointsFieldId }: { domain: string; email: string; apiToken: string; storyPointsFieldId?: string | null },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -1093,16 +1095,16 @@ export const resolvers = {
       if (existing) {
         const [row] = await db
           .update(jiraConfig)
-          .set({ domain, email, apiToken })
+          .set({ domain, email, apiToken, storyPointsFieldId: storyPointsFieldId ?? null })
           .where(eq(jiraConfig.ownerId, ownerId))
           .returning();
-        return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+        return { id: row.id, domain: row.domain, email: row.email, hasToken: true, storyPointsFieldId: row.storyPointsFieldId ?? null };
       }
       const [row] = await db
         .insert(jiraConfig)
-        .values({ ownerId, domain, email, apiToken })
+        .values({ ownerId, domain, email, apiToken, storyPointsFieldId: storyPointsFieldId ?? null })
         .returning();
-      return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+      return { id: row.id, domain: row.domain, email: row.email, hasToken: true, storyPointsFieldId: row.storyPointsFieldId ?? null };
     },
     removeJiraConfig: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);

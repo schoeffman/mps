@@ -1,9 +1,12 @@
+import { getUSHolidays } from "./schedule-utils";
+
 export interface JiraIssue {
   key: string;
   summary: string;
   status: string;
   statusColor: string;
   assignee: string | null;
+  storyPoints: number | null;
 }
 
 export interface Assignment {
@@ -40,9 +43,28 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function isWeekend(d: Date): boolean {
+function buildHolidaySet(ranges: { start: Date; end: Date }[]): Set<string> {
+  const years = new Set<number>();
+  for (const r of ranges) {
+    for (let y = r.start.getFullYear(); y <= r.end.getFullYear(); y++) {
+      years.add(y);
+    }
+  }
+  const set = new Set<string>();
+  for (const y of years) {
+    for (const h of getUSHolidays(y)) {
+      set.add(formatDate(h.date));
+    }
+  }
+  return set;
+}
+
+let holidaySet: Set<string> = new Set();
+
+function isNonWorkDay(d: Date): boolean {
   const day = d.getDay();
-  return day === 0 || day === 6;
+  if (day === 0 || day === 6) return true;
+  return holidaySet.has(formatDate(d));
 }
 
 function addDays(d: Date, n: number): Date {
@@ -53,7 +75,7 @@ function addDays(d: Date, n: number): Date {
 
 function nextBusinessDay(d: Date): Date {
   let result = new Date(d);
-  while (isWeekend(result)) {
+  while (isNonWorkDay(result)) {
     result = addDays(result, 1);
   }
   return result;
@@ -100,7 +122,7 @@ function scheduleTaskForWorker(worker: WorkerState): { start: Date; end: Date } 
     let current = new Date(start);
 
     while (current <= range.end) {
-      if (!isWeekend(current)) {
+      if (!isNonWorkDay(current)) {
         businessDaysUsed++;
         if (businessDaysUsed === TASK_DAYS) {
           const end = new Date(current);
@@ -142,6 +164,12 @@ export function scheduleIssues(
   if (assignments.length === 0) {
     return { scheduled: [], unscheduled: nonDoneIssues };
   }
+
+  // Build holiday set from all assignment ranges
+  const allRanges = assignments.flatMap((a) =>
+    a.dateRanges.map((r) => ({ start: parseDate(r.start), end: parseDate(r.end) }))
+  );
+  holidaySet = buildHolidaySet(allRanges);
 
   const workers: WorkerState[] = assignments
     .filter((a) => a.dateRanges.length > 0)
