@@ -1,6 +1,8 @@
-import { Gantt, Willow } from "@svar-ui/react-gantt";
+import { useRef, useEffect } from "react";
+import { Gantt, Willow, WillowDark } from "@svar-ui/react-gantt";
 import { format, startOfWeek, addDays } from "date-fns";
 import { getUSHolidays } from "@/lib/schedule-utils";
+import { useTheme } from "@/hooks/use-theme";
 import "@svar-ui/react-gantt/all.css";
 
 export interface GanttTask {
@@ -23,30 +25,32 @@ const taskTypes = Array.from({ length: 8 }, (_, i) => ({
   label: `Assignee ${i}`,
 }));
 
-const scales = [
-  { unit: "month", step: 1, format: (date: Date) => format(date, "MMMM yyyy") },
-  { unit: "day", step: 1, format: (date: Date) => format(date, "d") },
-];
+const FLAG = "\u2691";
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function buildHolidaySet(start: Date, end: Date): Set<string> {
+function buildHolidayMap(start: Date, end: Date): Map<string, string> {
   const years = new Set<number>();
   for (let y = start.getFullYear(); y <= end.getFullYear(); y++) {
     years.add(y);
   }
-  const set = new Set<string>();
+  const map = new Map<string, string>();
   for (const y of years) {
     for (const h of getUSHolidays(y)) {
-      set.add(toDateKey(h.date));
+      map.set(toDateKey(h.date), h.name);
     }
   }
-  return set;
+  return map;
 }
 
 export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const ThemeWrapper = isDark ? WillowDark : Willow;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   const svarTasks = tasks.map((t) => ({
     id: t.id,
     text: t.text,
@@ -68,18 +72,52 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
   const chartStart = earliestStart < thisWeek ? earliestStart : thisWeek;
   const chartEnd = addDays(latestEnd, 7);
 
-  const holidays = buildHolidaySet(chartStart, chartEnd);
+  const holidayMap = buildHolidayMap(chartStart, chartEnd);
+
+  const scales = [
+    { unit: "month", step: 1, format: (date: Date) => format(date, "MMMM yyyy") },
+    {
+      unit: "day",
+      step: 1,
+      format: (date: Date) => {
+        const name = holidayMap.get(toDateKey(date));
+        return name ? `${format(date, "d")} ${FLAG}` : format(date, "d");
+      },
+    },
+  ];
 
   const highlightTime = (date: Date, unit: "day" | "hour") => {
     if (unit !== "day") return "";
     const day = date.getDay();
     if (day === 0 || day === 6) return "gantt-weekend";
-    if (holidays.has(toDateKey(date))) return "gantt-holiday";
+    if (holidayMap.has(toDateKey(date))) return "gantt-holiday";
     return "";
   };
 
+  // Add native title tooltips to scale cells that contain the flag
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const cells = el.querySelectorAll<HTMLElement>(".wx-scale .wx-cell, [class*='wx-ZkvhDKir']");
+    cells.forEach((cell) => {
+      if (cell.textContent?.includes(FLAG)) {
+        // Walk dates from chartStart to find which holiday this cell represents
+        const dayNum = parseInt(cell.textContent, 10);
+        if (isNaN(dayNum)) return;
+        // Find matching holiday by day-of-month
+        for (const [key, name] of holidayMap) {
+          const d = new Date(key + "T00:00:00");
+          if (d.getDate() === dayNum) {
+            cell.title = name;
+            break;
+          }
+        }
+      }
+    });
+  });
+
   return (
-    <div className="gantt-chart-wrapper overflow-x-auto border rounded-lg">
+    <div ref={wrapperRef} className="gantt-chart-wrapper overflow-x-auto border rounded-lg">
       <style>{`
         .gantt-chart-wrapper .wx-bar.assignee-0 { background-color: #2684ff; }
         .gantt-chart-wrapper .wx-bar.assignee-1 { background-color: #36b37e; }
@@ -89,10 +127,11 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
         .gantt-chart-wrapper .wx-bar.assignee-5 { background-color: #00b8d9; }
         .gantt-chart-wrapper .wx-bar.assignee-6 { background-color: #ff8b00; }
         .gantt-chart-wrapper .wx-bar.assignee-7 { background-color: #6b778c; }
-        .gantt-chart-wrapper .gantt-weekend { background-color: #f0f0f0; }
-        .gantt-chart-wrapper .gantt-holiday { background-color: #f0f0f0; }
+        .gantt-chart-wrapper .gantt-weekend { background-color: ${isDark ? "#1a1f25" : "#f0f0f0"}; }
+        .gantt-chart-wrapper .gantt-holiday { background-color: ${isDark ? "#1a1f25" : "#f0f0f0"}; }
+        .gantt-chart-wrapper .wx-scale .gantt-holiday { color: ${isDark ? "#eab308" : "#ca8a04"}; }
       `}</style>
-      <Willow>
+      <ThemeWrapper>
         <Gantt
           tasks={svarTasks}
           scales={scales}
@@ -105,7 +144,7 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
           highlightTime={highlightTime}
           onSelectTask={(ev: { id: string }) => onTaskClick?.(ev.id)}
         />
-      </Willow>
+      </ThemeWrapper>
     </div>
   );
 }
