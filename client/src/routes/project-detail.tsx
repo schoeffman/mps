@@ -362,6 +362,38 @@ export default function ProjectDetail() {
       {project.jiraProjectKey && (
         <section className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Jira Issues</h2>
+          {jiraIssuesData?.jiraIssues?.length > 0 && (() => {
+            const counts: Record<string, { count: number; color: string }> = {};
+            for (const issue of jiraIssuesData.jiraIssues) {
+              if (!counts[issue.status]) {
+                counts[issue.status] = { count: 0, color: jiraStatusColor(issue.statusColor, issue.status) };
+              }
+              counts[issue.status].count++;
+            }
+            const total = jiraIssuesData.jiraIssues.length;
+            const entries = Object.entries(counts).sort((a, b) => b[1].count - a[1].count);
+            return (
+              <div className="mb-4">
+                <div className="flex h-5 w-full rounded overflow-hidden">
+                  {entries.map(([status, { count, color }]) => (
+                    <div
+                      key={status}
+                      style={{ width: `${(count / total) * 100}%`, backgroundColor: color }}
+                      title={`${status}: ${count} (${Math.round((count / total) * 100)}%)`}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                  {entries.map(([status, { count, color }]) => (
+                    <span key={status} className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
+                      {status} ({count})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {jiraLoading ? (
             <p className="text-sm text-muted-foreground">Loading Jira issues...</p>
           ) : jiraError ? (
@@ -451,7 +483,7 @@ export default function ProjectDetail() {
                       <span className="inline-flex items-center gap-1.5">
                         <span
                           className="size-2 rounded-full"
-                          style={{ backgroundColor: jiraStatusColor(issue.statusColor) }}
+                          style={{ backgroundColor: jiraStatusColor(issue.statusColor, issue.status) }}
                         />
                         {issue.status}
                       </span>
@@ -472,13 +504,19 @@ export default function ProjectDetail() {
   );
 }
 
-function jiraStatusColor(colorName: string): string {
+function jiraStatusColor(colorName: string, statusName?: string): string {
+  const statusOverrides: Record<string, string> = {
+    cancelled: "#c1c7d0",
+  };
+  if (statusName && statusOverrides[statusName.toLowerCase()]) {
+    return statusOverrides[statusName.toLowerCase()];
+  }
   const colors: Record<string, string> = {
     "blue-gray": "#6b778c",
     blue: "#2684ff",
     yellow: "#ffab00",
     green: "#36b37e",
-    "medium-gray": "#6b778c",
+    "medium-gray": "#c1c7d0",
   };
   return colors[colorName] ?? "#6b778c";
 }
