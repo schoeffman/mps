@@ -6,6 +6,71 @@ export interface JiraIssue {
   assignee: string | null;
 }
 
+export interface JiraTransition {
+  id: string;
+  name: string;
+}
+
+export async function fetchJiraTransitions(
+  domain: string,
+  email: string,
+  apiToken: string,
+  issueKey: string,
+): Promise<JiraTransition[]> {
+  const baseUrl = `https://${domain}.atlassian.net`;
+  const url = `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`;
+
+  const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Jira API error (${response.status}): ${text}`);
+  }
+
+  const data = await response.json();
+
+  return (data.transitions ?? []).map((t: { id: string; name: string }) => ({
+    id: t.id,
+    name: t.name,
+  }));
+}
+
+export async function transitionJiraIssue(
+  domain: string,
+  email: string,
+  apiToken: string,
+  issueKey: string,
+  transitionId: string,
+): Promise<void> {
+  const baseUrl = `https://${domain}.atlassian.net`;
+  const url = `${baseUrl}/rest/api/3/issue/${issueKey}/transitions`;
+
+  const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ transition: { id: transitionId } }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Jira API error (${response.status}): ${text}`);
+  }
+}
+
 export async function fetchJiraIssues(
   domain: string,
   email: string,

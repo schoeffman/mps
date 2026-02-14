@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -100,6 +100,21 @@ const GET_JIRA_ISSUES = gql`
   }
 `;
 
+const GET_JIRA_TRANSITIONS = gql`
+  query GetJiraTransitions($issueKey: String!) {
+    jiraTransitions(issueKey: $issueKey) {
+      id
+      name
+    }
+  }
+`;
+
+const TRANSITION_JIRA_ISSUE = gql`
+  mutation TransitionJiraIssue($issueKey: String!, $transitionId: String!) {
+    transitionJiraIssue(issueKey: $issueKey, transitionId: $transitionId)
+  }
+`;
+
 const GET_PROJECT_ASSIGNMENTS = gql`
   query GetProjectAssignments($projectId: Int!) {
     projectAssignments(projectId: $projectId) {
@@ -165,6 +180,7 @@ export default function ProjectDetail() {
 
   const [linkUrl, setLinkUrl] = useState("");
   const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null } | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
   const [jiraSortCol, setJiraSortCol] = useState<string>("status");
   const [jiraSortAsc, setJiraSortAsc] = useState(false);
@@ -214,6 +230,29 @@ export default function ProjectDetail() {
     nextFetchPolicy: "cache-first",
     pollInterval: 300000,
   });
+
+  const { data: transitionsData, loading: transitionsLoading } = useQuery(GET_JIRA_TRANSITIONS, {
+    variables: { issueKey: selectedIssue?.key ?? "" },
+    skip: !selectedIssue,
+    fetchPolicy: "network-only",
+  });
+
+  const [transitionJiraIssue] = useMutation(TRANSITION_JIRA_ISSUE);
+
+  async function handleTransition(transitionId: string) {
+    if (!selectedIssue) return;
+    setTransitioning(true);
+    try {
+      await transitionJiraIssue({ variables: { issueKey: selectedIssue.key, transitionId } });
+      const { data: refreshed } = await refetchJiraIssues();
+      const updated = refreshed?.jiraIssues?.find((i: { key: string }) => i.key === selectedIssue.key);
+      if (updated) setSelectedIssue(updated);
+    } catch (err) {
+      console.error("Transition failed:", err);
+    } finally {
+      setTransitioning(false);
+    }
+  }
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
@@ -584,13 +623,35 @@ export default function ProjectDetail() {
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Status</p>
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ backgroundColor: jiraStatusColor(selectedIssue.statusColor, selectedIssue.status) }}
-                  />
-                  {selectedIssue.status}
+                  {transitioning ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <span
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: jiraStatusColor(selectedIssue.statusColor, selectedIssue.status) }}
+                    />
+                  )}
+                  {transitioning ? "Updating..." : selectedIssue.status}
                 </span>
               </div>
+              {!transitionsLoading && transitionsData?.jiraTransitions?.length > 0 && (
+                <details>
+                  <summary className="text-xs text-muted-foreground cursor-pointer select-none">Move to</summary>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {transitionsData.jiraTransitions.map((t: { id: string; name: string }) => (
+                      <Button
+                        key={t.id}
+                        variant="outline"
+                        size="sm"
+                        disabled={transitioning}
+                        onClick={() => handleTransition(t.id)}
+                      >
+                        {t.name}
+                      </Button>
+                    ))}
+                  </div>
+                </details>
+              )}
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Assignee</p>
                 <p className="text-sm">{selectedIssue.assignee ?? "Unassigned"}</p>

@@ -4,7 +4,7 @@ import { db } from "./db/index.js";
 import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
-import { fetchJiraIssues } from "./lib/jira-client.js";
+import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue } from "./lib/jira-client.js";
 
 export interface Context {
   session: {
@@ -155,6 +155,11 @@ export const typeDefs = gql`
     assignee: String
   }
 
+  type JiraTransition {
+    id: String!
+    name: String!
+  }
+
   input CreateProjectInput {
     name: String!
     targetDate: String!
@@ -276,6 +281,7 @@ export const typeDefs = gql`
     spaceMembers: [SpaceMember!]!
     jiraConfig: JiraConfig
     jiraIssues(projectId: Int!): [JiraIssue!]!
+    jiraTransitions(issueKey: String!): [JiraTransition!]!
   }
 
   input BulkAssignmentInput {
@@ -309,6 +315,7 @@ export const typeDefs = gql`
     removeSpaceMember(memberAuthId: String!): Boolean!
     saveJiraConfig(domain: String!, email: String!, apiToken: String!): JiraConfig!
     removeJiraConfig: Boolean!
+    transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
     deleteMyAccount: Boolean!
   }
 `;
@@ -664,6 +671,12 @@ export const resolvers = {
       const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
       if (!config) throw new Error("Jira is not configured");
       return fetchJiraIssues(config.domain, config.email, config.apiToken, project.jiraProjectKey);
+    },
+    jiraTransitions: async (_: unknown, { issueKey }: { issueKey: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!config) throw new Error("Jira is not configured");
+      return fetchJiraTransitions(config.domain, config.email, config.apiToken, issueKey);
     },
   },
   Mutation: {
@@ -1080,6 +1093,14 @@ export const resolvers = {
       const ownerId = getOwnerId(context);
       const deleted = await db.delete(jiraConfig).where(eq(jiraConfig.ownerId, ownerId)).returning();
       return deleted.length > 0;
+    },
+    transitionJiraIssue: async (_: unknown, { issueKey, transitionId }: { issueKey: string; transitionId: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      requireAuth(context);
+      const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!config) throw new Error("Jira is not configured");
+      await transitionJiraIssue(config.domain, config.email, config.apiToken, issueKey, transitionId);
+      return true;
     },
     addSpaceMember: async (_: unknown, { email }: { email: string }, context: Context) => {
       const { user } = requireAuth(context);
