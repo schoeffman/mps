@@ -29,7 +29,7 @@ export interface ScheduleResult {
   unscheduled: JiraIssue[];
 }
 
-const TASK_DAYS = 3;
+const DEFAULT_TASK_DAYS = 3;
 
 function parseDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
@@ -114,7 +114,7 @@ function advanceCursorToRange(worker: WorkerState): boolean {
   return false;
 }
 
-function scheduleTaskForWorker(worker: WorkerState): { start: Date; end: Date } | null {
+function scheduleTaskForWorker(worker: WorkerState, days: number): { start: Date; end: Date } | null {
   while (advanceCursorToRange(worker)) {
     const start = new Date(worker.cursor);
     const range = worker.ranges[worker.rangeIndex];
@@ -124,7 +124,7 @@ function scheduleTaskForWorker(worker: WorkerState): { start: Date; end: Date } 
     while (current <= range.end) {
       if (!isNonWorkDay(current)) {
         businessDaysUsed++;
-        if (businessDaysUsed === TASK_DAYS) {
+        if (businessDaysUsed === days) {
           const end = new Date(current);
           worker.cursor = addDays(current, 1);
           return { start, end };
@@ -208,6 +208,8 @@ export function scheduleIssues(
   const unscheduled: JiraIssue[] = [];
 
   for (const issue of nonDoneIssues) {
+    const taskDays = issue.storyPoints ?? DEFAULT_TASK_DAYS;
+
     // Save all worker states, try scheduling on each, pick earliest finish
     const snapshots = workers.map((w) => ({
       rangeIndex: w.rangeIndex,
@@ -220,7 +222,7 @@ export function scheduleIssues(
     const results: ({ start: Date; end: Date } | null)[] = [];
 
     for (let i = 0; i < workers.length; i++) {
-      const slot = scheduleTaskForWorker(workers[i]);
+      const slot = scheduleTaskForWorker(workers[i], taskDays);
       results.push(slot);
       if (slot && slot.end.getTime() < bestEnd) {
         bestEnd = slot.end.getTime();
@@ -241,7 +243,7 @@ export function scheduleIssues(
     }
 
     // Re-run the winner to advance its state
-    scheduleTaskForWorker(workers[bestIdx]);
+    scheduleTaskForWorker(workers[bestIdx], taskDays);
     const slot = bestSlot;
 
     const truncatedSummary =

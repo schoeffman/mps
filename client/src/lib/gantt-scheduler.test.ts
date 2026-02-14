@@ -8,6 +8,7 @@ function makeIssue(key: string, opts?: Partial<JiraIssue>): JiraIssue {
     status: "To Do",
     statusColor: "blue-gray",
     assignee: null,
+    storyPoints: null,
     ...opts,
   };
 }
@@ -182,5 +183,44 @@ describe("scheduleIssues", () => {
     ];
     const result = scheduleIssues(issues, assignments);
     expect(result.scheduled[0].start).toBe("2025-01-06"); // Monday
+  });
+
+  it("uses story points as duration (1 point = 1 day)", () => {
+    const issues = [makeIssue("PROJ-1", { storyPoints: 5 })];
+    // Mon Jan 6 to Fri Jan 31
+    const assignments = [
+      makeAssignment("Alice", [{ start: "2025-01-06", end: "2025-01-31" }]),
+    ];
+    const result = scheduleIssues(issues, assignments);
+    expect(result.scheduled).toHaveLength(1);
+    const task = result.scheduled[0];
+    expect(task.start).toBe("2025-01-06"); // Monday
+    expect(task.end).toBe("2025-01-10"); // Friday (5 business days)
+  });
+
+  it("uses 1 story point for a single-day task", () => {
+    const issues = [makeIssue("PROJ-1", { storyPoints: 1 })];
+    const assignments = [
+      makeAssignment("Alice", [{ start: "2025-01-06", end: "2025-01-31" }]),
+    ];
+    const result = scheduleIssues(issues, assignments);
+    const task = result.scheduled[0];
+    expect(task.start).toBe("2025-01-06");
+    expect(task.end).toBe("2025-01-06"); // same day
+  });
+
+  it("sequences tasks with different story points", () => {
+    const issues = [
+      makeIssue("PROJ-1", { storyPoints: 2 }),
+      makeIssue("PROJ-2", { storyPoints: 1 }),
+    ];
+    const assignments = [
+      makeAssignment("Alice", [{ start: "2025-01-06", end: "2025-01-31" }]),
+    ];
+    const result = scheduleIssues(issues, assignments);
+    expect(result.scheduled[0].start).toBe("2025-01-06");
+    expect(result.scheduled[0].end).toBe("2025-01-07"); // 2 days: Mon-Tue
+    expect(result.scheduled[1].start).toBe("2025-01-08"); // Wed
+    expect(result.scheduled[1].end).toBe("2025-01-08"); // 1 day: Wed
   });
 });

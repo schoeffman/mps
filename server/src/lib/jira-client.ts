@@ -91,8 +91,8 @@ export async function fetchJiraIssues(
 
   const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
 
-  const fields = ["summary", "status", "assignee", "description"];
-  if (storyPointsFieldId) fields.push(storyPointsFieldId);
+  const spFieldId = storyPointsFieldId || "customfield_33062";
+  const fields = ["summary", "status", "assignee", "description", spFieldId];
 
   const response = await fetch(url, {
     method: "POST",
@@ -133,7 +133,7 @@ export async function fetchJiraIssues(
     status: issue.fields.status.name,
     statusColor: issue.fields.status.statusCategory.colorName,
     assignee: issue.fields.assignee?.displayName ?? null,
-    storyPoints: storyPointsFieldId ? (issue.fields[storyPointsFieldId] as number | null) ?? null : null,
+    storyPoints: (issue.fields[spFieldId] as number | null) ?? null,
   }));
 }
 
