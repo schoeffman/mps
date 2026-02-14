@@ -1,9 +1,10 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
+import { fetchJiraIssues } from "./lib/jira-client.js";
 
 export interface Context {
   session: {
@@ -133,9 +134,25 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
+    jiraProjectKey: String
     members: [User!]!
     links: [ProjectLink!]!
     createdAt: String!
+  }
+
+  type JiraConfig {
+    id: Int!
+    domain: String!
+    email: String!
+    hasToken: Boolean!
+  }
+
+  type JiraIssue {
+    key: String!
+    summary: String!
+    status: String!
+    statusColor: String!
+    assignee: String
   }
 
   input CreateProjectInput {
@@ -145,6 +162,7 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType
+    jiraProjectKey: String
   }
 
   input UpdateProjectInput {
@@ -154,6 +172,7 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
+    jiraProjectKey: String
   }
 
   type Schedule {
@@ -255,6 +274,8 @@ export const typeDefs = gql`
     me: SessionInfo
     mySpaces: [Space!]!
     spaceMembers: [SpaceMember!]!
+    jiraConfig: JiraConfig
+    jiraIssues(projectId: Int!): [JiraIssue!]!
   }
 
   input BulkAssignmentInput {
@@ -286,6 +307,8 @@ export const typeDefs = gql`
     linkAuthUser(appUserId: Int!): Boolean!
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
+    saveJiraConfig(domain: String!, email: String!, apiToken: String!): JiraConfig!
+    removeJiraConfig: Boolean!
     deleteMyAccount: Boolean!
   }
 `;
@@ -395,6 +418,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     status: projectRow.status,
     color: projectRow.color,
     projectType: projectTypeFromDb[projectRow.projectType] ?? "FeatureDevelopment",
+    jiraProjectKey: projectRow.jiraProjectKey ?? null,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     links: linkRows.map((l) => ({ id: l.id, url: l.url, createdAt: l.createdAt.toISOString() })),
     createdAt: projectRow.createdAt.toISOString(),
@@ -626,6 +650,21 @@ export const resolvers = {
         return { id: r.id, authId: r.memberAuthId, email: u?.email ?? "", name: u?.name ?? "", image: u?.image ?? null, createdAt: r.createdAt.toISOString() };
       });
     },
+    jiraConfig: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!row) return null;
+      return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+    },
+    jiraIssues: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      if (!project.jiraProjectKey) return [];
+      const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!config) throw new Error("Jira is not configured");
+      return fetchJiraIssues(config.domain, config.email, config.apiToken, project.jiraProjectKey);
+    },
   },
   Mutation: {
     createUser: async (
@@ -741,7 +780,7 @@ export const resolvers = {
     },
     createProject: async (
       _: unknown,
-      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string } },
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string; jiraProjectKey?: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -755,6 +794,7 @@ export const resolvers = {
           status: input.status,
           color: input.color,
           projectType: projectTypeToDb[input.projectType ?? "FeatureDevelopment"] ?? "Feature Development",
+          jiraProjectKey: input.jiraProjectKey ?? null,
           ownerId,
         })
         .returning();
@@ -767,7 +807,7 @@ export const resolvers = {
     },
     updateProject: async (
       _: unknown,
-      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string } },
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string; jiraProjectKey?: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -781,6 +821,7 @@ export const resolvers = {
           status: input.status,
           color: input.color,
           projectType: projectTypeToDb[input.projectType] ?? "Feature Development",
+          jiraProjectKey: input.jiraProjectKey ?? null,
         })
         .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
         .returning();
@@ -1014,6 +1055,32 @@ export const resolvers = {
         .returning();
       return updated.length > 0;
     },
+    saveJiraConfig: async (
+      _: unknown,
+      { domain, email, apiToken }: { domain: string; email: string; apiToken: string },
+      context: Context,
+    ) => {
+      const ownerId = getOwnerId(context);
+      const [existing] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (existing) {
+        const [row] = await db
+          .update(jiraConfig)
+          .set({ domain, email, apiToken })
+          .where(eq(jiraConfig.ownerId, ownerId))
+          .returning();
+        return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+      }
+      const [row] = await db
+        .insert(jiraConfig)
+        .values({ ownerId, domain, email, apiToken })
+        .returning();
+      return { id: row.id, domain: row.domain, email: row.email, hasToken: true };
+    },
+    removeJiraConfig: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(jiraConfig).where(eq(jiraConfig.ownerId, ownerId)).returning();
+      return deleted.length > 0;
+    },
     addSpaceMember: async (_: unknown, { email }: { email: string }, context: Context) => {
       const { user } = requireAuth(context);
       // Look up the target user by email
@@ -1033,6 +1100,9 @@ export const resolvers = {
     },
     deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
+
+      // Delete Jira config
+      await db.delete(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
 
       // Delete space memberships (both as owner and as member)
       await db.delete(spaceMembers).where(or(eq(spaceMembers.spaceOwnerId, ownerId), eq(spaceMembers.memberAuthId, ownerId)));

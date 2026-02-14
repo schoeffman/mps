@@ -95,6 +95,7 @@ export const projects = pgTable("projects", {
   status: text("status").notNull().default("Explore"),
   color: text("color").notNull().default("blue"),
   projectType: text("project_type").notNull().default("Feature Development"),
+  jiraProjectKey: text("jira_project_key"),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -163,3 +164,12 @@ export const spaceMembers = pgTable("space_members", {
   memberAuthId: text("member_auth_id").notNull().references(() => authUser.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [unique().on(table.spaceOwnerId, table.memberAuthId)]);
+
+export const jiraConfig = pgTable("jira_config", {
+  id: serial("id").primaryKey(),
+  ownerId: text("owner_id").notNull().unique().references(() => authUser.id),
+  domain: text("domain").notNull(),
+  email: text("email").notNull(),
+  apiToken: text("api_token").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

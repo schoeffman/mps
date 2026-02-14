@@ -21,6 +21,34 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+const JIRA_CONFIG = gql`
+  query JiraConfig {
+    jiraConfig {
+      id
+      domain
+      email
+      hasToken
+    }
+  }
+`;
+
+const SAVE_JIRA_CONFIG = gql`
+  mutation SaveJiraConfig($domain: String!, $email: String!, $apiToken: String!) {
+    saveJiraConfig(domain: $domain, email: $email, apiToken: $apiToken) {
+      id
+      domain
+      email
+      hasToken
+    }
+  }
+`;
+
+const REMOVE_JIRA_CONFIG = gql`
+  mutation RemoveJiraConfig {
+    removeJiraConfig
+  }
+`;
+
 const DELETE_MY_ACCOUNT = gql`
   mutation DeleteMyAccount {
     deleteMyAccount
@@ -67,6 +95,15 @@ export default function Settings() {
   const [deleteMyAccount] = useMutation(DELETE_MY_ACCOUNT);
   const [email, setEmail] = useState("");
   const [addError, setAddError] = useState("");
+
+  // Jira config
+  const { data: jiraData, refetch: refetchJira } = useQuery(JIRA_CONFIG, { skip: !isOwner });
+  const [saveJiraConfig, { loading: savingJira }] = useMutation(SAVE_JIRA_CONFIG);
+  const [removeJiraConfig] = useMutation(REMOVE_JIRA_CONFIG);
+  const [jiraDomain, setJiraDomain] = useState("");
+  const [jiraEmail, setJiraEmail] = useState("");
+  const [jiraToken, setJiraToken] = useState("");
+  const [jiraError, setJiraError] = useState("");
 
   const { data: membersData, refetch: refetchMembers } = useQuery(SPACE_MEMBERS, { skip: !isOwner });
   const members = membersData?.spaceMembers ?? [];
@@ -117,6 +154,30 @@ export default function Settings() {
     }
   }
 
+  async function handleSaveJira(e: React.FormEvent) {
+    e.preventDefault();
+    setJiraError("");
+    try {
+      await saveJiraConfig({ variables: { domain: jiraDomain.trim(), email: jiraEmail.trim(), apiToken: jiraToken.trim() } });
+      setJiraToken("");
+      refetchJira();
+    } catch (err: unknown) {
+      setJiraError(err instanceof Error ? err.message : "Failed to save Jira config");
+    }
+  }
+
+  async function handleRemoveJira() {
+    try {
+      await removeJiraConfig();
+      setJiraDomain("");
+      setJiraEmail("");
+      setJiraToken("");
+      refetchJira();
+    } catch {
+      alert("Failed to remove Jira config.");
+    }
+  }
+
   return (
     <>
       <h1 className="text-2xl font-semibold mb-6">Account Settings</h1>
@@ -158,6 +219,86 @@ export default function Settings() {
           {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         </Button>
       </section>
+
+      {/* Jira Integration — only in own space */}
+      {isOwner && (
+        <section className="mb-8">
+          <h2 className="text-lg font-medium mb-4">Jira Integration</h2>
+          {jiraData?.jiraConfig ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-4 space-y-1">
+                <p className="text-sm"><span className="font-medium">Domain:</span> {jiraData.jiraConfig.domain}.atlassian.net</p>
+                <p className="text-sm"><span className="font-medium">Email:</span> {jiraData.jiraConfig.email}</p>
+                <p className="text-sm"><span className="font-medium">API Token:</span> ••••••••</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setJiraDomain(jiraData.jiraConfig.domain);
+                    setJiraEmail(jiraData.jiraConfig.email);
+                    setJiraToken("");
+                  }}
+                >
+                  Update
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleRemoveJira}>
+                  Remove
+                </Button>
+              </div>
+              {(jiraDomain || jiraEmail) && (
+                <form onSubmit={handleSaveJira} className="space-y-3 mt-3">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="jira-domain">Jira Domain</label>
+                    <div className="flex items-center gap-1">
+                      <Input id="jira-domain" placeholder="mycompany" value={jiraDomain} onChange={(e) => setJiraDomain(e.target.value)} required className="max-w-48" />
+                      <span className="text-sm text-muted-foreground">.atlassian.net</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="jira-email">Email</label>
+                    <Input id="jira-email" type="email" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} required className="max-w-sm" />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="jira-token">API Token</label>
+                    <Input id="jira-token" type="password" placeholder="Enter new API token" value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} required className="max-w-sm" />
+                  </div>
+                  {jiraError && <p className="text-sm text-destructive">{jiraError}</p>}
+                  <Button type="submit" disabled={savingJira} size="sm">
+                    {savingJira ? "Saving..." : "Save"}
+                  </Button>
+                </form>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleSaveJira} className="space-y-3">
+              <p className="text-sm text-muted-foreground mb-2">
+                Connect your Jira Cloud instance to view issues on project pages.
+              </p>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor="jira-domain">Jira Domain</label>
+                <div className="flex items-center gap-1">
+                  <Input id="jira-domain" placeholder="mycompany" value={jiraDomain} onChange={(e) => setJiraDomain(e.target.value)} required className="max-w-48" />
+                  <span className="text-sm text-muted-foreground">.atlassian.net</span>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor="jira-email">Email</label>
+                <Input id="jira-email" type="email" placeholder="you@example.com" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} required className="max-w-sm" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium" htmlFor="jira-token">API Token</label>
+                <Input id="jira-token" type="password" placeholder="Jira API token" value={jiraToken} onChange={(e) => setJiraToken(e.target.value)} required className="max-w-sm" />
+              </div>
+              {jiraError && <p className="text-sm text-destructive">{jiraError}</p>}
+              <Button type="submit" disabled={savingJira}>
+                {savingJira ? "Saving..." : "Save Jira Config"}
+              </Button>
+            </form>
+          )}
+        </section>
+      )}
 
       {/* Space Sharing Section — only in own space */}
       {isOwner && (

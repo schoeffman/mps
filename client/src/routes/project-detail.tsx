@@ -39,6 +39,7 @@ const GET_PROJECT = gql`
       status
       color
       projectType
+      jiraProjectKey
       links {
         id
         url
@@ -68,6 +69,27 @@ const ADD_PROJECT_LINK = gql`
 const REMOVE_PROJECT_LINK = gql`
   mutation RemoveProjectLink($id: Int!) {
     removeProjectLink(id: $id)
+  }
+`;
+
+const JIRA_CONFIG_FOR_PROJECT = gql`
+  query JiraConfigForProject {
+    jiraConfig {
+      id
+      domain
+    }
+  }
+`;
+
+const GET_JIRA_ISSUES = gql`
+  query GetJiraIssues($projectId: Int!) {
+    jiraIssues(projectId: $projectId) {
+      key
+      summary
+      status
+      statusColor
+      assignee
+    }
   }
 `;
 
@@ -135,6 +157,13 @@ export default function ProjectDetail() {
   });
 
   const [linkUrl, setLinkUrl] = useState("");
+
+  const hasJiraKey = data?.project?.jiraProjectKey;
+  const { data: jiraConfigData } = useQuery(JIRA_CONFIG_FOR_PROJECT, { skip: !hasJiraKey });
+  const { data: jiraIssuesData, loading: jiraLoading, error: jiraError } = useQuery(GET_JIRA_ISSUES, {
+    variables: { projectId },
+    skip: !hasJiraKey,
+  });
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
@@ -289,6 +318,73 @@ export default function ProjectDetail() {
           </Button>
         </form>
       </section>
+
+      {/* Jira Issues Section */}
+      {project.jiraProjectKey && (
+        <section className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">Jira Issues</h2>
+          {jiraLoading ? (
+            <p className="text-sm text-muted-foreground">Loading Jira issues...</p>
+          ) : jiraError ? (
+            <p className="text-sm text-destructive">Failed to load Jira issues: {jiraError.message}</p>
+          ) : jiraIssuesData?.jiraIssues?.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Key</TableHead>
+                  <TableHead>Summary</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assignee</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {jiraIssuesData.jiraIssues.map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
+                  <TableRow key={issue.key}>
+                    <TableCell className="font-medium">
+                      {jiraConfigData?.jiraConfig?.domain ? (
+                        <a
+                          href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {issue.key}
+                        </a>
+                      ) : (
+                        issue.key
+                      )}
+                    </TableCell>
+                    <TableCell>{issue.summary}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: jiraStatusColor(issue.statusColor) }}
+                        />
+                        {issue.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{issue.assignee ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No issues found.</p>
+          )}
+        </section>
+      )}
     </>
   );
+}
+
+function jiraStatusColor(colorName: string): string {
+  const colors: Record<string, string> = {
+    "blue-gray": "#6b778c",
+    blue: "#2684ff",
+    yellow: "#ffab00",
+    green: "#36b37e",
+    "medium-gray": "#6b778c",
+  };
+  return colors[colorName] ?? "#6b778c";
 }

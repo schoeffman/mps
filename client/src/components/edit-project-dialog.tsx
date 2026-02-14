@@ -35,7 +35,16 @@ const UPDATE_PROJECT = gql`
       status
       color
       projectType
+      jiraProjectKey
       createdAt
+    }
+  }
+`;
+
+const JIRA_CONFIG = gql`
+  query JiraConfigCheck {
+    jiraConfig {
+      id
     }
   }
 `;
@@ -49,6 +58,7 @@ interface EditProjectDialogProps {
     status: string;
     color: string;
     projectType: string;
+    jiraProjectKey?: string | null;
   };
   trigger?: React.ReactNode;
 }
@@ -61,8 +71,10 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
   const [color, setColor] = useState(project.color);
   const [projectType, setProjectType] = useState(project.projectType);
   const [driId, setDriId] = useState<string>(String(project.dri.id));
+  const [jiraProjectKey, setJiraProjectKey] = useState(project.jiraProjectKey ?? "");
 
   const { data: usersData } = useQuery(GET_USERS);
+  const { data: jiraConfigData } = useQuery(JIRA_CONFIG);
   const [updateProject, { loading }] = useMutation(UPDATE_PROJECT, {
     refetchQueries: [{ query: GET_PROJECTS }, "GetScheduleDetail"],
   });
@@ -76,6 +88,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setColor(project.color);
     setProjectType(project.projectType);
     setDriId(String(project.dri.id));
+    setJiraProjectKey(project.jiraProjectKey ?? "");
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -90,7 +103,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, color, projectType },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType, jiraProjectKey: jiraProjectKey.trim() || null },
       },
     });
     setOpen(false);
@@ -190,6 +203,18 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
               </SelectContent>
             </Select>
           </div>
+
+          {jiraConfigData?.jiraConfig && (
+            <div className="grid gap-2">
+              <Label htmlFor="edit-jiraProjectKey">Jira Project Key</Label>
+              <Input
+                id="edit-jiraProjectKey"
+                placeholder="e.g. MPS"
+                value={jiraProjectKey}
+                onChange={(e) => setJiraProjectKey(e.target.value)}
+              />
+            </div>
+          )}
 
           <Button
             type="submit"
