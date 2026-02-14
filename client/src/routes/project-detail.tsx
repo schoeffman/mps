@@ -472,6 +472,7 @@ export default function ProjectDetail() {
               <Button
                 variant={showGantt ? "outline" : "default"}
                 size="sm"
+                className="ml-auto"
                 onClick={() => setShowGantt((v) => !v)}
               >
                 <BarChart3 className="size-4 mr-1.5" />

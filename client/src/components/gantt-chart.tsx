@@ -94,6 +94,32 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
     return "";
   };
 
+  // Once bars render, scroll the chart so the first task bar is visible
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    function scrollToFirstBar() {
+      const chartArea = el!.querySelector<HTMLElement>(".wx-chart, [class*='wx-mR7v2Xag']");
+      const firstBar = el!.querySelector<HTMLElement>(".wx-bar");
+      if (chartArea && firstBar) {
+        chartArea.scrollLeft = Math.max(0, firstBar.offsetLeft - 40);
+        return true;
+      }
+      return false;
+    }
+
+    // Bars may already exist
+    if (scrollToFirstBar()) return;
+
+    // Otherwise wait for the library to render them
+    const observer = new MutationObserver(() => {
+      if (scrollToFirstBar()) observer.disconnect();
+    });
+    observer.observe(el, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Add native title tooltips to scale cells that contain the flag
   useEffect(() => {
     const el = wrapperRef.current;
