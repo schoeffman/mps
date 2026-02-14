@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
@@ -157,6 +157,43 @@ export default function ProjectDetail() {
   });
 
   const [linkUrl, setLinkUrl] = useState("");
+  const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
+  const resizeRef = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
+  const colRatios = [0.15, 0.50, 0.175, 0.175];
+
+  const jiraTableRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node || jiraColWidths) return;
+    const width = node.clientWidth;
+    setJiraColWidths(colRatios.map(r => Math.floor(r * width)));
+  }, [jiraColWidths]);
+
+  const onResizeStart = useCallback((colIndex: number, e: React.MouseEvent) => {
+    if (!jiraColWidths) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = jiraColWidths[colIndex];
+    resizeRef.current = { colIndex, startX, startWidth };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const diff = ev.clientX - resizeRef.current.startX;
+      const newWidth = Math.max(60, resizeRef.current.startWidth + diff);
+      setJiraColWidths(prev => {
+        const next = [...prev];
+        next[resizeRef.current!.colIndex] = newWidth;
+        return next;
+      });
+    };
+
+    const onMouseUp = () => {
+      resizeRef.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [jiraColWidths]);
 
   const hasJiraKey = data?.project?.jiraProjectKey;
   const { data: jiraConfigData } = useQuery(JIRA_CONFIG_FOR_PROJECT, { skip: !hasJiraKey });
@@ -328,19 +365,35 @@ export default function ProjectDetail() {
           ) : jiraError ? (
             <p className="text-sm text-destructive">Failed to load Jira issues: {jiraError.message}</p>
           ) : jiraIssuesData?.jiraIssues?.length > 0 ? (
-            <Table>
+            <div className="overflow-x-auto" ref={jiraTableRef}>
+            {jiraColWidths && (
+            <Table style={{ tableLayout: "fixed", width: jiraColWidths.reduce((a, b) => a + b, 0) }}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Summary</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assignee</TableHead>
+                  {["Key", "Summary", "Status", "Assignee"].map((label, i) => (
+                    <TableHead key={label} style={{ width: jiraColWidths![i], position: "relative" }}>
+                      {label}
+                      <div
+                        onMouseDown={(e) => onResizeStart(i, e)}
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 6,
+                          cursor: "col-resize",
+                          userSelect: "none",
+                        }}
+                        className="hover:bg-border"
+                      />
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {jiraIssuesData.jiraIssues.map((issue: { key: string; summary: string; status: string; statusColor: string; assignee: string | null }) => (
                   <TableRow key={issue.key}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                       {jiraConfigData?.jiraConfig?.domain ? (
                         <a
                           href={`https://${jiraConfigData.jiraConfig.domain}.atlassian.net/browse/${issue.key}`}
@@ -354,8 +407,8 @@ export default function ProjectDetail() {
                         issue.key
                       )}
                     </TableCell>
-                    <TableCell>{issue.summary}</TableCell>
-                    <TableCell>
+                    <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">{issue.summary}</TableCell>
+                    <TableCell className="overflow-hidden text-ellipsis whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
                         <span
                           className="size-2 rounded-full"
@@ -364,11 +417,13 @@ export default function ProjectDetail() {
                         {issue.status}
                       </span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{issue.assignee ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{issue.assignee ?? "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            )}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No issues found.</p>
           )}
