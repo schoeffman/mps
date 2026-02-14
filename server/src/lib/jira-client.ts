@@ -13,16 +13,24 @@ export async function fetchJiraIssues(
   projectKey: string,
 ): Promise<JiraIssue[]> {
   const baseUrl = `https://${domain}.atlassian.net`;
-  const jql = `project=${projectKey} ORDER BY created DESC`;
-  const url = `${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,status,assignee`;
+  const url = `${baseUrl}/rest/api/3/search/jql`;
 
   const auth = Buffer.from(`${email}:${apiToken}`).toString("base64");
 
   const response = await fetch(url, {
+    method: "POST",
     headers: {
       Authorization: `Basic ${auth}`,
       Accept: "application/json",
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      jql: projectKey.includes("-")
+        ? `parent=${projectKey} ORDER BY created DESC`
+        : `project=${projectKey} ORDER BY created DESC`,
+      maxResults: 50,
+      fields: ["summary", "status", "assignee"],
+    }),
   });
 
   if (!response.ok) {
