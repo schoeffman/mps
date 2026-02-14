@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.12.0",
+    "@svar-ui/react-gantt": "^2.5.2",
     "@tailwindcss/vite": "^4.1.18",
     "better-auth": "^1.4.18",
     "class-variance-authority": "^0.7.1",

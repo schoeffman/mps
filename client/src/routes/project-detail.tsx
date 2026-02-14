@@ -1,8 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useLazyQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2, BarChart3 } from "lucide-react";
+import { GanttChart, type GanttTask } from "@/components/gantt-chart";
+import { scheduleIssues, type JiraIssue, type Assignment } from "@/lib/gantt-scheduler";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -204,6 +206,7 @@ export default function ProjectDetail() {
   const [jiraColWidths, setJiraColWidths] = useState<number[] | null>(null);
   const [jiraSortCol, setJiraSortCol] = useState<string>("status");
   const [jiraSortAsc, setJiraSortAsc] = useState(false);
+  const [showGantt, setShowGantt] = useState(false);
   const resizeRef = useRef<{ colIndex: number; startX: number; startWidth: number } | null>(null);
   const colRatios = [0.15, 0.50, 0.175, 0.175];
 
@@ -291,6 +294,15 @@ export default function ProjectDetail() {
       setTransitioning(false);
     }
   }
+
+  const ganttResult = useMemo(() => {
+    if (!showGantt || !jiraIssuesData?.jiraIssues || !assignmentsData?.projectAssignments) return null;
+    return scheduleIssues(
+      jiraIssuesData.jiraIssues as JiraIssue[],
+      assignmentsData.projectAssignments as Assignment[],
+      new Date()
+    );
+  }, [showGantt, jiraIssuesData, assignmentsData]);
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
@@ -455,7 +467,66 @@ export default function ProjectDetail() {
                 <RefreshCw className={jiraLoading ? "animate-spin" : ""} />
               </Button>
             )}
+            {hasJiraKey && jiraIssuesData?.jiraIssues?.length > 0 && assignmentsData?.projectAssignments?.length > 0 && (
+              <Button
+                variant={showGantt ? "outline" : "default"}
+                size="sm"
+                onClick={() => setShowGantt((v) => !v)}
+              >
+                <BarChart3 className="size-4 mr-1.5" />
+                {showGantt ? "Hide Gantt" : "Generate Gantt"}
+              </Button>
+            )}
           </div>
+          {showGantt && ganttResult && (
+            <div className="mb-4">
+              {ganttResult.scheduled.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs text-muted-foreground">
+                    {(() => {
+                      const palette = ["#2684ff", "#36b37e", "#ffab00", "#ff5630", "#6554c0", "#00b8d9", "#ff8b00", "#6b778c"];
+                      const seen = new Map<string, string>();
+                      ganttResult.scheduled.forEach((t) => {
+                        if (!seen.has(t.assignee)) seen.set(t.assignee, t.type);
+                      });
+                      return Array.from(seen.entries()).map(([name, type]) => {
+                        const idx = parseInt(type.replace("assignee-", ""), 10) || 0;
+                        return (
+                          <span key={name} className="inline-flex items-center gap-1.5">
+                            <span className="size-2 rounded-full" style={{ backgroundColor: palette[idx % palette.length] }} />
+                            {name}
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <GanttChart
+                    tasks={ganttResult.scheduled as GanttTask[]}
+                    onTaskClick={(taskId) => {
+                      const issue = jiraIssuesData?.jiraIssues?.find(
+                        (i: { key: string }) => i.key === taskId
+                      );
+                      if (issue) setSelectedIssue(issue);
+                    }}
+                  />
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No issues could be scheduled — team members may not have date ranges assigned.</p>
+              )}
+              {ganttResult.unscheduled.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Unscheduled ({ganttResult.unscheduled.length} issues — not enough team capacity):
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-0.5">
+                    {ganttResult.unscheduled.map((issue) => (
+                      <li key={issue.key}>{issue.key}: {issue.summary}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {!jiraConfigLoading && !jiraConfigData?.jiraConfig ? (
             <p className="text-sm text-muted-foreground">
               Jira integration is not configured. Set it up in{" "}
