@@ -405,6 +405,42 @@ export default function ProjectDetail() {
               </div>
             );
           })()}
+          {jiraIssuesData?.jiraIssues?.length > 0 && (() => {
+            const doneIssues = jiraIssuesData.jiraIssues.filter(
+              (issue: { statusColor: string }) => issue.statusColor === "green"
+            );
+            if (doneIssues.length === 0) return null;
+            const counts: Record<string, number> = {};
+            for (const issue of doneIssues) {
+              const name = (issue as { assignee: string | null }).assignee ?? "Unassigned";
+              counts[name] = (counts[name] ?? 0) + 1;
+            }
+            const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const total = doneIssues.length;
+            const palette = ["#2684ff", "#36b37e", "#ffab00", "#ff5630", "#6554c0", "#00b8d9", "#ff8b00", "#6b778c"];
+            return (
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-1">Done by assignee</p>
+                <div className="flex h-5 w-full rounded overflow-hidden">
+                  {entries.map(([name, count], i) => (
+                    <div
+                      key={name}
+                      style={{ width: `${(count / total) * 100}%`, backgroundColor: palette[i % palette.length] }}
+                      title={`${name}: ${count} (${Math.round((count / total) * 100)}%)`}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                  {entries.map(([name, count], i) => (
+                    <span key={name} className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
+                      {name} ({count})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {jiraLoading ? (
             <p className="text-sm text-muted-foreground">Loading Jira issues...</p>
           ) : jiraError ? (
