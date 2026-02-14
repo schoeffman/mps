@@ -93,34 +93,29 @@ function advanceCursorToRange(worker: WorkerState): boolean {
 }
 
 function scheduleTaskForWorker(worker: WorkerState): { start: Date; end: Date } | null {
-  if (!advanceCursorToRange(worker)) return null;
-
-  const start = new Date(worker.cursor);
-  let businessDaysUsed = 0;
-  let current = new Date(start);
-
-  while (businessDaysUsed < TASK_DAYS) {
-    if (worker.rangeIndex >= worker.ranges.length) return null;
+  while (advanceCursorToRange(worker)) {
+    const start = new Date(worker.cursor);
     const range = worker.ranges[worker.rangeIndex];
+    let businessDaysUsed = 0;
+    let current = new Date(start);
 
-    if (current > range.end) {
-      worker.rangeIndex++;
-      if (worker.rangeIndex < worker.ranges.length) {
-        current = new Date(worker.ranges[worker.rangeIndex].start);
-        current = nextBusinessDay(current);
+    while (current <= range.end) {
+      if (!isWeekend(current)) {
+        businessDaysUsed++;
+        if (businessDaysUsed === TASK_DAYS) {
+          const end = new Date(current);
+          worker.cursor = addDays(current, 1);
+          return { start, end };
+        }
       }
-      continue;
+      current = addDays(current, 1);
     }
 
-    if (!isWeekend(current)) {
-      businessDaysUsed++;
-      if (businessDaysUsed === TASK_DAYS) {
-        const end = new Date(current);
-        worker.cursor = addDays(current, 1);
-        return { start, end };
-      }
+    // Not enough business days in this range — skip to next
+    worker.rangeIndex++;
+    if (worker.rangeIndex < worker.ranges.length) {
+      worker.cursor = new Date(worker.ranges[worker.rangeIndex].start);
     }
-    current = addDays(current, 1);
   }
 
   return null;
@@ -185,35 +180,41 @@ export function scheduleIssues(
   const unscheduled: JiraIssue[] = [];
 
   for (const issue of nonDoneIssues) {
-    let bestWorker: WorkerState | null = null;
-    let bestTime = Infinity;
+    // Save all worker states, try scheduling on each, pick earliest finish
+    const snapshots = workers.map((w) => ({
+      rangeIndex: w.rangeIndex,
+      cursor: new Date(w.cursor),
+    }));
 
-    for (const worker of workers) {
-      const saved = {
-        rangeIndex: worker.rangeIndex,
-        cursor: new Date(worker.cursor),
-      };
-      if (advanceCursorToRange(worker)) {
-        const t = worker.cursor.getTime();
-        if (t < bestTime) {
-          bestTime = t;
-          bestWorker = worker;
-        }
+    let bestIdx = -1;
+    let bestEnd = Infinity;
+    let bestSlot: { start: Date; end: Date } | null = null;
+    const results: ({ start: Date; end: Date } | null)[] = [];
+
+    for (let i = 0; i < workers.length; i++) {
+      const slot = scheduleTaskForWorker(workers[i]);
+      results.push(slot);
+      if (slot && slot.end.getTime() < bestEnd) {
+        bestEnd = slot.end.getTime();
+        bestIdx = i;
+        bestSlot = slot;
       }
-      worker.rangeIndex = saved.rangeIndex;
-      worker.cursor = new Date(saved.cursor);
     }
 
-    if (!bestWorker) {
+    // Restore all workers, then re-apply only the winner's advancement
+    for (let i = 0; i < workers.length; i++) {
+      workers[i].rangeIndex = snapshots[i].rangeIndex;
+      workers[i].cursor = new Date(snapshots[i].cursor);
+    }
+
+    if (bestIdx === -1 || !bestSlot) {
       unscheduled.push(issue);
       continue;
     }
 
-    const slot = scheduleTaskForWorker(bestWorker);
-    if (!slot) {
-      unscheduled.push(issue);
-      continue;
-    }
+    // Re-run the winner to advance its state
+    scheduleTaskForWorker(workers[bestIdx]);
+    const slot = bestSlot;
 
     const truncatedSummary =
       issue.summary.length > 40
@@ -225,9 +226,9 @@ export function scheduleIssues(
       text: `${issue.key}: ${truncatedSummary}`,
       start: formatDate(slot.start),
       end: formatDate(slot.end),
-      assignee: bestWorker.name,
+      assignee: workers[bestIdx].name,
       progress: 0,
-      type: assigneeTypeMap.get(bestWorker.name) ?? ASSIGNEE_TYPES[0],
+      type: assigneeTypeMap.get(workers[bestIdx].name) ?? ASSIGNEE_TYPES[0],
     });
   }
 
