@@ -263,6 +263,7 @@ export const typeDefs = gql`
     phase: String!
     description: String!
     completed: Boolean!
+    skipped: Boolean!
     completedBy: String
     completedAt: String
   }
@@ -338,6 +339,7 @@ export const typeDefs = gql`
     transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
     assignJiraIssue(issueKey: String!, accountId: String): Boolean!
     toggleProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
+    skipProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
     deleteMyAccount: Boolean!
   }
 `;
@@ -740,7 +742,8 @@ export const resolvers = {
         const completion = completionMap.get(item.key);
         return {
           ...item,
-          completed: !!completion,
+          completed: completion?.status === "completed",
+          skipped: completion?.status === "skipped",
           completedBy: completion?.completedBy ?? null,
           completedAt: completion?.completedAt ?? null,
         };
@@ -1202,12 +1205,35 @@ export const resolvers = {
       if (!project) throw new Error("Project not found");
       if (!CHECKLIST_TEMPLATE.some((t) => t.key === itemKey)) throw new Error("Invalid checklist item key");
       const [existing] = await db.select().from(projectChecklistCompletions).where(and(eq(projectChecklistCompletions.projectId, projectId), eq(projectChecklistCompletions.itemKey, itemKey)));
-      if (existing) {
+      if (existing?.status === "completed") {
         await db.delete(projectChecklistCompletions).where(eq(projectChecklistCompletions.id, existing.id));
         return false;
       }
       const today = new Date().toISOString().split("T")[0];
-      await db.insert(projectChecklistCompletions).values({ projectId, itemKey, completedBy: user.email, completedAt: today });
+      if (existing) {
+        await db.update(projectChecklistCompletions).set({ status: "completed", completedBy: user.email, completedAt: today }).where(eq(projectChecklistCompletions.id, existing.id));
+      } else {
+        await db.insert(projectChecklistCompletions).values({ projectId, itemKey, status: "completed", completedBy: user.email, completedAt: today });
+      }
+      return true;
+    },
+    skipProjectChecklistItem: async (_: unknown, { projectId, itemKey }: { projectId: number; itemKey: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const { user } = requireAuth(context);
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      if (!CHECKLIST_TEMPLATE.some((t) => t.key === itemKey)) throw new Error("Invalid checklist item key");
+      const [existing] = await db.select().from(projectChecklistCompletions).where(and(eq(projectChecklistCompletions.projectId, projectId), eq(projectChecklistCompletions.itemKey, itemKey)));
+      if (existing?.status === "skipped") {
+        await db.delete(projectChecklistCompletions).where(eq(projectChecklistCompletions.id, existing.id));
+        return false;
+      }
+      const today = new Date().toISOString().split("T")[0];
+      if (existing) {
+        await db.update(projectChecklistCompletions).set({ status: "skipped", completedBy: user.email, completedAt: today }).where(eq(projectChecklistCompletions.id, existing.id));
+      } else {
+        await db.insert(projectChecklistCompletions).values({ projectId, itemKey, status: "skipped", completedBy: user.email, completedAt: today });
+      }
       return true;
     },
     deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {

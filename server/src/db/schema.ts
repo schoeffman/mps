@@ -171,6 +171,7 @@ export const projectChecklistCompletions = pgTable("project_checklist_completion
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   itemKey: text("item_key").notNull(),
+  status: text("status").notNull().default("completed"),
   completedBy: text("completed_by").notNull(),
   completedAt: text("completed_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

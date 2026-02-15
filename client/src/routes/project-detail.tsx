@@ -6,7 +6,6 @@ import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Load
 import { GanttChart, type GanttTask } from "@/components/gantt-chart";
 import { scheduleIssues, type JiraIssue, type Assignment } from "@/lib/gantt-scheduler";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -161,6 +160,7 @@ const PROJECT_CHECKLIST = gql`
       phase
       description
       completed
+      skipped
       completedBy
       completedAt
     }
@@ -170,6 +170,12 @@ const PROJECT_CHECKLIST = gql`
 const TOGGLE_CHECKLIST_ITEM = gql`
   mutation ToggleProjectChecklistItem($projectId: Int!, $itemKey: String!) {
     toggleProjectChecklistItem(projectId: $projectId, itemKey: $itemKey)
+  }
+`;
+
+const SKIP_CHECKLIST_ITEM = gql`
+  mutation SkipProjectChecklistItem($projectId: Int!, $itemKey: String!) {
+    skipProjectChecklistItem(projectId: $projectId, itemKey: $itemKey)
   }
 `;
 
@@ -223,6 +229,9 @@ export default function ProjectDetail() {
     variables: { projectId },
   });
   const [toggleChecklistItem] = useMutation(TOGGLE_CHECKLIST_ITEM, {
+    refetchQueries: [{ query: PROJECT_CHECKLIST, variables: { projectId } }],
+  });
+  const [skipChecklistItem] = useMutation(SKIP_CHECKLIST_ITEM, {
     refetchQueries: [{ query: PROJECT_CHECKLIST, variables: { projectId } }],
   });
 
@@ -491,8 +500,8 @@ export default function ProjectDetail() {
 
       {/* Checklist Section */}
       {checklistData?.projectChecklist && (() => {
-        const items = checklistData.projectChecklist as { key: string; phase: string; description: string; completed: boolean; completedBy: string | null; completedAt: string | null }[];
-        const totalCompleted = items.filter((i) => i.completed).length;
+        const items = checklistData.projectChecklist as { key: string; phase: string; description: string; completed: boolean; skipped: boolean; completedBy: string | null; completedAt: string | null }[];
+        const doneCount = items.filter((i) => i.completed || i.skipped).length;
         const phases = ["Wonder", "Explore", "Make"];
         return (
           <section className="mt-6">
@@ -500,42 +509,54 @@ export default function ProjectDetail() {
               <summary className="cursor-pointer select-none">
                 <span className="inline-flex items-center gap-2">
                   <span className="text-lg font-semibold">Project Checklist</span>
-                  <span className="text-sm text-muted-foreground">({totalCompleted}/{items.length})</span>
+                  <span className="text-sm text-muted-foreground">({doneCount}/{items.length})</span>
                 </span>
               </summary>
               <div className="mt-3">
                 {phases.map((phase) => {
                   const phaseItems = items.filter((i) => i.phase === phase);
-                  const completedCount = phaseItems.filter((i) => i.completed).length;
+                  const donePhaseCount = phaseItems.filter((i) => i.completed || i.skipped).length;
                   return (
                     <div key={phase} className="mb-4">
                       <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                        {phase} ({completedCount}/{phaseItems.length})
+                        {phase} ({donePhaseCount}/{phaseItems.length})
                       </h3>
                       <div className="space-y-2">
                         {phaseItems.map((item) => (
-                          <label
+                          <div
                             key={item.key}
-                            className="flex items-start gap-2 cursor-pointer"
+                            className="flex items-start gap-2"
                           >
-                            <Checkbox
-                              checked={item.completed}
-                              onCheckedChange={() =>
-                                toggleChecklistItem({ variables: { projectId, itemKey: item.key } })
-                              }
-                              className="mt-0.5"
-                            />
-                            <div className="flex flex-col">
-                              <span className={item.completed ? "line-through text-muted-foreground" : "text-sm"}>
+                            <div className="flex shrink-0 gap-1">
+                              <Button
+                                variant={item.completed ? "default" : "outline"}
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => toggleChecklistItem({ variables: { projectId, itemKey: item.key } })}
+                              >
+                                {item.completed ? "Undo" : "Complete"}
+                              </Button>
+                              <Button
+                                variant={item.skipped ? "default" : "outline"}
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => skipChecklistItem({ variables: { projectId, itemKey: item.key } })}
+                              >
+                                {item.skipped ? "Undo" : "Skip"}
+                              </Button>
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className={item.completed || item.skipped ? "line-through text-muted-foreground" : "text-sm"}>
                                 {item.description}
+                                {item.skipped && <span className="ml-1.5 text-xs italic">(skipped)</span>}
                               </span>
-                              {item.completed && item.completedBy && (
+                              {(item.completed || item.skipped) && item.completedBy && (
                                 <span className="text-xs text-muted-foreground">
-                                  {item.completedBy} on {new Date(item.completedAt + "T00:00:00").toLocaleDateString()}
+                                  {item.skipped ? "Skipped" : "Completed"} by {item.completedBy} on {new Date(item.completedAt + "T00:00:00").toLocaleDateString()}
                                 </span>
                               )}
                             </div>
-                          </label>
+                          </div>
                         ))}
                       </div>
                     </div>
