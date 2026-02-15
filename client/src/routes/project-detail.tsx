@@ -227,6 +227,8 @@ export default function ProjectDetail() {
   });
 
   const [linkUrl, setLinkUrl] = useState("");
+  const [jiraRefreshing, setJiraRefreshing] = useState(false);
+  const [jiraLastSynced, setJiraLastSynced] = useState<Date | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<{ key: string; summary: string; status: string; statusColor: string; assignee: string | null; storyPoints: number | null } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -280,6 +282,7 @@ export default function ProjectDetail() {
     fetchPolicy: "cache-and-network",
     nextFetchPolicy: "cache-first",
     pollInterval: 300000,
+    onCompleted: () => setJiraLastSynced(new Date()),
   });
 
   const { data: transitionsData, loading: transitionsLoading } = useQuery(GET_JIRA_TRANSITIONS, {
@@ -549,9 +552,30 @@ export default function ProjectDetail() {
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-lg font-semibold">Jira Issues</h2>
             {hasJiraKey && (
-              <Button variant="ghost" size="icon-xs" onClick={() => refetchJiraIssues()} title="Refresh Jira issues">
-                <RefreshCw className={jiraLoading ? "animate-spin" : ""} />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={jiraRefreshing}
+                  onClick={async () => {
+                    setJiraRefreshing(true);
+                    try {
+                      await refetchJiraIssues();
+                      setJiraLastSynced(new Date());
+                    } finally {
+                      setJiraRefreshing(false);
+                    }
+                  }}
+                  title="Refresh Jira issues"
+                >
+                  <RefreshCw className={jiraRefreshing ? "animate-spin" : ""} />
+                </Button>
+                {jiraLastSynced && (
+                  <span className="text-xs text-muted-foreground">
+                    Synced {jiraLastSynced.toLocaleTimeString()}
+                  </span>
+                )}
+              </>
             )}
             {hasJiraKey && jiraIssuesData?.jiraIssues?.length > 0 && assignmentsData?.projectAssignments?.length > 0 && (
               <Button
