@@ -154,6 +154,8 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
                 <SelectItem value="Explore">Explore</SelectItem>
                 <SelectItem value="Make">Make</SelectItem>
                 <SelectItem value="Complete">Complete</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                <SelectItem value="Paused">Paused</SelectItem>
               </SelectContent>
             </Select>
           </div>

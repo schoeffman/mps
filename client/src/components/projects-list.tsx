@@ -26,6 +26,8 @@ const statusVariant: Record<string, "default" | "secondary" | "outline"> = {
   Explore: "outline",
   Make: "default",
   Complete: "secondary",
+  Cancelled: "secondary",
+  Paused: "outline",
 };
 
 export function ProjectsList({ projects }: { projects: Project[] }) {

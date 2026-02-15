@@ -113,6 +113,8 @@ export const typeDefs = gql`
     Explore
     Make
     Complete
+    Cancelled
+    Paused
   }
 
   enum ProjectType {

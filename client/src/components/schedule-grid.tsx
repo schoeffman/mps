@@ -72,7 +72,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     refetchQueries: ["GetScheduleDetail"],
   });
 
-  const assignableProjects = useMemo(() => projects.filter((p) => p.status !== "Complete"), [projects]);
+  const assignableProjects = useMemo(() => projects.filter((p) => p.status !== "Complete" && p.status !== "Cancelled"), [projects]);
 
   // Paint mode state
   const [activeProjectId, setActiveProjectId] = useState<number | null | "eraser">(null);

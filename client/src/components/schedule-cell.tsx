@@ -11,6 +11,7 @@ const NONE_VALUE = "__none__";
 interface Project {
   id: number;
   name: string;
+  status?: string;
 }
 
 interface ScheduleCellProps {
@@ -97,7 +98,7 @@ export function ScheduleCell({
             const completed = lookupProjects.find((p) => p.id === projectId);
             return completed ? (
               <SelectItem key={completed.id} value={String(completed.id)}>
-                <span className="text-muted-foreground">{completed.name} (Complete)</span>
+                <span className="text-muted-foreground">{completed.name} ({completed.status ?? "Complete"})</span>
               </SelectItem>
             ) : null;
           })()}
