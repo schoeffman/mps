@@ -272,6 +272,7 @@ export const typeDefs = gql`
     start: String!
     end: String!
     scheduleName: String!
+    scheduleId: Int!
   }
 
   type ProjectAssignment {

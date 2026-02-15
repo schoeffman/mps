@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Pencil } from "lucide-react";
 import { getProjectColor } from "@/lib/project-colors";
 import { EditProjectDialog } from "./edit-project-dialog";
 
@@ -198,20 +200,25 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
                   className="inline-block w-3 h-3 rounded-sm shrink-0"
                   style={{ backgroundColor: s.color }}
                 />
-                <span>
-                  {project ? (
+                <span className="inline-flex items-center gap-1">
+                  {project && (
                     <EditProjectDialog
                       project={project}
                       trigger={
-                        <button className="hover:underline cursor-pointer text-left">
-                          {s.label}
+                        <button className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                          <Pencil className="size-3" />
                         </button>
                       }
                     />
+                  )}
+                  {project ? (
+                    <Link to={`/projects/${project.id}`} className="hover:underline">{s.label}</Link>
                   ) : (
                     s.label
-                  )}{" "}
-                  ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
+                  )}
+                </span>
+                <span className="text-sm">
+                  {" "}({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
                 </span>
               </div>
             );

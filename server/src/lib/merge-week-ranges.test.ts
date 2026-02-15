@@ -12,7 +12,7 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-20", scheduleName: "Q1" },
+      { start: "2025-01-06", end: "2025-01-20", scheduleName: "Q1", scheduleId: 1 },
     ]);
   });
 
@@ -22,8 +22,8 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-13", scheduleName: "Q1" },
-      { start: "2025-02-03", end: "2025-02-10", scheduleName: "Q1" },
+      { start: "2025-01-06", end: "2025-01-13", scheduleName: "Q1", scheduleId: 1 },
+      { start: "2025-02-03", end: "2025-02-10", scheduleName: "Q1", scheduleId: 1 },
     ]);
   });
 
@@ -33,7 +33,7 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-06", scheduleName: "Q1" },
+      { start: "2025-01-06", end: "2025-01-06", scheduleName: "Q1", scheduleId: 1 },
     ]);
   });
 
@@ -44,8 +44,8 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-13", scheduleName: "Q1" },
-      { start: "2025-04-07", end: "2025-04-14", scheduleName: "Q2" },
+      { start: "2025-01-06", end: "2025-01-13", scheduleName: "Q1", scheduleId: 1 },
+      { start: "2025-04-07", end: "2025-04-14", scheduleName: "Q2", scheduleId: 2 },
     ]);
   });
 
@@ -55,7 +55,7 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-20", scheduleName: "Q1" },
+      { start: "2025-01-06", end: "2025-01-20", scheduleName: "Q1", scheduleId: 1 },
     ]);
   });
 
@@ -71,9 +71,9 @@ describe("mergeWeekRanges", () => {
     ]);
     const result = mergeWeekRanges(bySchedule);
     expect(result).toEqual([
-      { start: "2025-01-06", end: "2025-01-06", scheduleName: "Q1" },
-      { start: "2025-01-27", end: "2025-01-27", scheduleName: "Q1" },
-      { start: "2025-02-17", end: "2025-02-17", scheduleName: "Q1" },
+      { start: "2025-01-06", end: "2025-01-06", scheduleName: "Q1", scheduleId: 1 },
+      { start: "2025-01-27", end: "2025-01-27", scheduleName: "Q1", scheduleId: 1 },
+      { start: "2025-02-17", end: "2025-02-17", scheduleName: "Q1", scheduleId: 1 },
     ]);
   });
 });

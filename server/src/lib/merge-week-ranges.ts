@@ -2,6 +2,7 @@ export interface DateRange {
   start: string;
   end: string;
   scheduleName: string;
+  scheduleId: number;
 }
 
 export interface ScheduleWeeks {
@@ -15,7 +16,7 @@ export interface ScheduleWeeks {
  */
 export function mergeWeekRanges(bySchedule: Map<number, ScheduleWeeks>): DateRange[] {
   const dateRanges: DateRange[] = [];
-  for (const [, { scheduleName, weeks }] of bySchedule) {
+  for (const [scheduleId, { scheduleName, weeks }] of bySchedule) {
     weeks.sort();
     let rangeStart = weeks[0];
     let rangeEnd = weeks[0];
@@ -26,12 +27,12 @@ export function mergeWeekRanges(bySchedule: Map<number, ScheduleWeeks>): DateRan
       if (diffDays === 7) {
         rangeEnd = weeks[i];
       } else {
-        dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
+        dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName, scheduleId });
         rangeStart = weeks[i];
         rangeEnd = weeks[i];
       }
     }
-    dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName });
+    dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName, scheduleId });
   }
   return dateRanges;
 }

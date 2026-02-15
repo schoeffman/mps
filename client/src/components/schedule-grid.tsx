@@ -37,6 +37,7 @@ interface Project {
   id: number;
   name: string;
   color: string;
+  status: string;
 }
 
 interface Assignment {
@@ -70,6 +71,8 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
   const [bulkSetAssignments] = useMutation(BULK_SET_SCHEDULE_ASSIGNMENTS, {
     refetchQueries: ["GetScheduleDetail"],
   });
+
+  const assignableProjects = useMemo(() => projects.filter((p) => p.status !== "Complete"), [projects]);
 
   // Paint mode state
   const [activeProjectId, setActiveProjectId] = useState<number | null | "eraser">(null);
@@ -215,7 +218,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
       {/* Paint mode toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium text-muted-foreground mr-1">Paint mode:</span>
-        {projects.map((p) => {
+        {assignableProjects.map((p) => {
           const chipColor = projectChipColorMap.get(p.id) ?? "";
           const isActive = activeProjectId === p.id;
           return (
@@ -283,7 +286,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                   >
                     <RowProjectPicker
                       memberName={team.name}
-                      projects={projects}
+                      projects={assignableProjects}
                       projectChipColorMap={projectChipColorMap}
                       onSelectProject={(projectId) => handleTeamAssign(team, projectId)}
                     />
@@ -313,7 +316,8 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                           userId={member.id}
                           weekStart={ws}
                           projectId={projectId}
-                          projects={projects}
+                          projects={assignableProjects}
+                          allProjects={projects}
                           bgColor={bgColor}
                           onAssign={handleAssign}
                           isPaintMode={isPaintMode}
@@ -361,7 +365,8 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                           userId={member.id}
                           weekStart={ws}
                           projectId={projectId}
-                          projects={projects}
+                          projects={assignableProjects}
+                          allProjects={projects}
                           bgColor={bgColor}
                           onAssign={handleAssign}
                           isPaintMode={isPaintMode}

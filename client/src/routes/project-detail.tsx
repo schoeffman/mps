@@ -148,6 +148,7 @@ const GET_PROJECT_ASSIGNMENTS = gql`
         start
         end
         scheduleName
+        scheduleId
       }
     }
   }
@@ -426,7 +427,7 @@ export default function ProjectDetail() {
             </TableHeader>
             <TableBody>
               {assignmentsData.projectAssignments.flatMap(
-                (assignment: { user: { id: number; fullName: string }; teamName: string | null; dateRanges: { start: string; end: string; scheduleName: string }[] }) =>
+                (assignment: { user: { id: number; fullName: string }; teamName: string | null; dateRanges: { start: string; end: string; scheduleName: string; scheduleId: number }[] }) =>
                   assignment.dateRanges.map((range, i) => (
                     <TableRow key={`${assignment.user.id}-${i}`}>
                       {i === 0 ? (
@@ -441,7 +442,11 @@ export default function ProjectDetail() {
                           </TableCell>
                         </>
                       ) : null}
-                      <TableCell>{range.scheduleName}</TableCell>
+                      <TableCell>
+                        <Link to={`/schedules/${range.scheduleId}`} className="hover:underline">
+                          {range.scheduleName}
+                        </Link>
+                      </TableCell>
                       <TableCell>{formatDateRange(range.start, range.end)}</TableCell>
                     </TableRow>
                   ))

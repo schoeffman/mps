@@ -18,6 +18,7 @@ interface ScheduleCellProps {
   weekStart: string;
   projectId: number | null;
   projects: Project[];
+  allProjects?: Project[];
   bgColor: string;
   onAssign: (userId: number, weekStart: string, projectId: number | null) => void;
   isPaintMode: boolean;
@@ -34,6 +35,7 @@ export function ScheduleCell({
   weekStart,
   projectId,
   projects,
+  allProjects,
   bgColor,
   onAssign,
   isPaintMode,
@@ -44,6 +46,7 @@ export function ScheduleCell({
   paintPreviewBg,
   isCurrentWeek,
 }: ScheduleCellProps) {
+  const lookupProjects = allProjects ?? projects;
   const handleChange = (value: string) => {
     if (value === NONE_VALUE) {
       onAssign(userId, weekStart, null);
@@ -59,7 +62,7 @@ export function ScheduleCell({
       : projectId;
     const displayBg = isPainted ? (paintPreviewBg ?? "") : bgColor;
     const projectName = previewProjectId
-      ? projects.find((p) => p.id === previewProjectId)?.name ?? "—"
+      ? lookupProjects.find((p) => p.id === previewProjectId)?.name ?? "—"
       : "—";
 
     return (
@@ -90,6 +93,14 @@ export function ScheduleCell({
           <SelectItem value={NONE_VALUE}>
             <span className="text-muted-foreground">— None —</span>
           </SelectItem>
+          {projectId && !projects.some((p) => p.id === projectId) && (() => {
+            const completed = lookupProjects.find((p) => p.id === projectId);
+            return completed ? (
+              <SelectItem key={completed.id} value={String(completed.id)}>
+                <span className="text-muted-foreground">{completed.name} (Complete)</span>
+              </SelectItem>
+            ) : null;
+          })()}
           {projects.map((p) => (
             <SelectItem key={p.id} value={String(p.id)}>
               {p.name}
