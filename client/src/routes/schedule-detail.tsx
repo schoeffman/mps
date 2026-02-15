@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GET_SCHEDULES } from "@/routes/schedules";
 import { EditScheduleDialog } from "@/components/edit-schedule-dialog";
@@ -137,6 +137,69 @@ export default function ScheduleDetail() {
     refetchQueries: [{ query: GET_SCHEDULES }],
   });
 
+  const handleExportCsv = useCallback(() => {
+    if (!detailData || !schedule || weekStarts.length === 0) return;
+
+    const projectMap = new Map<number, string>();
+    for (const p of detailData.projects) {
+      projectMap.set(p.id, p.name);
+    }
+
+    const assignmentMap = new Map<string, string>();
+    for (const a of detailData.scheduleAssignments) {
+      assignmentMap.set(`${a.userId}-${a.weekStart}`, projectMap.get(a.projectId) ?? "");
+    }
+
+    // Build a map from userId to team name
+    const userTeamMap = new Map<number, string>();
+    for (const team of detailData.teams) {
+      for (const member of team.members) {
+        userTeamMap.set(member.id, team.name);
+      }
+    }
+
+    // Collect all users in team order with team header rows, then unassigned
+    const rows: { name: string; team: string; id: number; isTeamHeader: boolean }[] = [];
+    for (const team of detailData.teams) {
+      rows.push({ name: team.name, team: "", id: -1, isTeamHeader: true });
+      for (const member of team.members) {
+        rows.push({ name: member.fullName, team: userTeamMap.get(member.id) ?? "", id: member.id, isTeamHeader: false });
+      }
+    }
+    if (unassignedUsers.length > 0) {
+      rows.push({ name: "Unassigned", team: "", id: -1, isTeamHeader: true });
+      for (const u of unassignedUsers) {
+        rows.push({ name: u.fullName, team: "", id: u.id, isTeamHeader: false });
+      }
+    }
+
+    const escapeCsv = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const header = ["Name", "Team", ...weekStarts].map(escapeCsv).join(",");
+    const lines = rows.map((row) => {
+      if (row.isTeamHeader) {
+        const cells = [row.name, row.team, ...weekStarts.map(() => "")];
+        return cells.map(escapeCsv).join(",");
+      }
+      const cells = [row.name, row.team, ...weekStarts.map((w) => assignmentMap.get(`${row.id}-${w}`) ?? "")];
+      return cells.map(escapeCsv).join(",");
+    });
+
+    const csv = [header, ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${schedule.name.replace(/\s+/g, "-")}-Q${schedule.quarter}-${schedule.year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [detailData, schedule, weekStarts, unassignedUsers]);
+
   if (scheduleLoading) return <div className="p-6">Loading schedule...</div>;
   if (scheduleError) return <div className="p-6 text-destructive">Error: {scheduleError.message}</div>;
   if (!schedule) return <div className="p-6">Schedule not found.</div>;
@@ -182,6 +245,12 @@ export default function ScheduleDetail() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+        {detailData && (
+          <Button variant="outline" size="sm" className="ml-auto" onClick={handleExportCsv}>
+            <Download className="size-4 mr-1.5" />
+            Export CSV
+          </Button>
+        )}
       </div>
 
       <p className="text-sm text-muted-foreground">
