@@ -85,9 +85,9 @@ export function ScheduleCell({
   }
 
   return (
-    <td className={`border-r p-0.5 ${bgColor} ${isCurrentWeek ? "border-x-2 border-x-blue-400 dark:border-x-blue-500" : ""}`}>
+    <td className={`border-r p-0 ${bgColor} ${isCurrentWeek ? "border-x-2 border-x-blue-400 dark:border-x-blue-500" : ""}`}>
       <Select value={projectId ? String(projectId) : NONE_VALUE} onValueChange={handleChange}>
-        <SelectTrigger size="sm" className="border-0 shadow-none bg-transparent w-full h-7 text-xs">
+        <SelectTrigger size="sm" className="border-0 shadow-none bg-transparent hover:bg-black/5 dark:hover:bg-white/5 w-full h-full min-h-[28px] text-xs rounded-none cursor-pointer">
           <SelectValue placeholder="—" />
         </SelectTrigger>
         <SelectContent position="popper" align="start">

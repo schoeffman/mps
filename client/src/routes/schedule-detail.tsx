@@ -60,6 +60,7 @@ const GET_SCHEDULE_DETAIL = gql`
       status
       color
       projectType
+      isSystem
       members {
         id
         fullName

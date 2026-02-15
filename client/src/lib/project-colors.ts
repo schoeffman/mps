@@ -57,6 +57,13 @@ export const PROJECT_COLOR_OPTIONS: ProjectColorOption[] = [
     hex: "#fdba74",
   },
   {
+    key: "yellow",
+    label: "Yellow",
+    cellBg: "bg-yellow-100 dark:bg-yellow-900/40",
+    chipBg: "bg-yellow-200 dark:bg-yellow-800 border-yellow-400 dark:border-yellow-600",
+    hex: "#fde047",
+  },
+  {
     key: "teal",
     label: "Teal",
     cellBg: "bg-teal-100 dark:bg-teal-900/40",

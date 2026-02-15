@@ -120,6 +120,7 @@ export const typeDefs = gql`
   enum ProjectType {
     FeatureDevelopment
     Maintenance
+    Other
   }
 
   type ProjectLink {
@@ -136,6 +137,7 @@ export const typeDefs = gql`
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
+    isSystem: Boolean!
     jiraProjectKey: String
     members: [User!]!
     links: [ProjectLink!]!
@@ -343,6 +345,7 @@ export const typeDefs = gql`
     assignJiraIssue(issueKey: String!, accountId: String): Boolean!
     toggleProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
     skipProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
+    updateProjectColor(id: Int!, color: String!): Project!
     deleteMyAccount: Boolean!
   }
 `;
@@ -382,11 +385,13 @@ const craftFocusFromDb: Record<string, string> = {
 const projectTypeToDb: Record<string, string> = {
   FeatureDevelopment: "Feature Development",
   Maintenance: "Maintenance",
+  Other: "Other",
 };
 
 const projectTypeFromDb: Record<string, string> = {
   "Feature Development": "FeatureDevelopment",
   Maintenance: "Maintenance",
+  Other: "Other",
 };
 
 const CHECKLIST_TEMPLATE = [
@@ -459,6 +464,40 @@ function mapScheduleAssignmentFromDb(row: typeof scheduleAssignments.$inferSelec
   };
 }
 
+const SYSTEM_PROJECTS = [
+  { name: "On Call", projectType: "Maintenance", color: "orange" },
+  { name: "Leave (Standard)", projectType: "Other", color: "cyan" },
+  { name: "Leave (Extended)", projectType: "Other", color: "purple" },
+  { name: "Other", projectType: "Other", color: "teal" },
+];
+
+async function ensureSystemProjects(ownerId: string) {
+  const existing = await db.select().from(projects).where(and(eq(projects.ownerId, ownerId), eq(projects.isSystem, true)));
+  if (existing.length >= SYSTEM_PROJECTS.length) return;
+
+  const existingNames = new Set(existing.map((p) => p.name));
+  const missing = SYSTEM_PROJECTS.filter((sp) => !existingNames.has(sp.name));
+  if (missing.length === 0) return;
+
+  // Find the owner's own user record to use as DRI (prefer auth-linked, fallback to first user)
+  const [ownerUser] = await db.select().from(users).where(and(eq(users.authUserId, ownerId), eq(users.ownerId, ownerId)));
+  const driUser = ownerUser ?? (await db.select().from(users).where(eq(users.ownerId, ownerId)).limit(1))[0];
+  if (!driUser) return; // No user records yet — skip seeding
+
+  for (const sp of missing) {
+    await db.insert(projects).values({
+      name: sp.name,
+      targetDate: "2099-12-31",
+      driId: driUser.id,
+      status: "Make",
+      color: sp.color,
+      projectType: sp.projectType,
+      isSystem: true,
+      ownerId,
+    });
+  }
+}
+
 async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
   const [driRow] = await db.select().from(users).where(eq(users.id, projectRow.driId));
   const memberRows = await db
@@ -476,6 +515,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     status: projectRow.status,
     color: projectRow.color,
     projectType: projectTypeFromDb[projectRow.projectType] ?? "FeatureDevelopment",
+    isSystem: projectRow.isSystem,
     jiraProjectKey: projectRow.jiraProjectKey ?? null,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     links: linkRows.map((l) => ({ id: l.id, url: l.url, createdAt: l.createdAt.toISOString() })),
@@ -510,6 +550,7 @@ export const resolvers = {
     },
     projects: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
+      await ensureSystemProjects(ownerId);
       const rows = await db.select().from(projects).where(eq(projects.ownerId, ownerId));
       return Promise.all(rows.map(mapProjectFromDb));
     },
@@ -899,6 +940,10 @@ export const resolvers = {
     ) => {
       const ownerId = getOwnerId(context);
 
+      // Guard: system projects cannot be edited
+      const [existing] = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)));
+      if (existing?.isSystem) throw new Error("System projects cannot be edited");
+
       const [projectRow] = await db
         .update(projects)
         .set({
@@ -924,6 +969,11 @@ export const resolvers = {
     },
     deleteProject: async (_: unknown, { id }: { id: number }, context: Context) => {
       const ownerId = getOwnerId(context);
+
+      // Guard: system projects cannot be deleted
+      const [existing] = await db.select().from(projects).where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)));
+      if (existing?.isSystem) throw new Error("System projects cannot be deleted");
+
       const deleted = await db.delete(projects).where(and(eq(projects.id, id), eq(projects.ownerId, ownerId))).returning();
       return deleted.length > 0;
     },
@@ -1238,6 +1288,16 @@ export const resolvers = {
         await db.insert(projectChecklistCompletions).values({ projectId, itemKey, status: "skipped", completedBy: user.email, completedAt: today });
       }
       return true;
+    },
+    updateProjectColor: async (_: unknown, { id, color }: { id: number; color: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [projectRow] = await db
+        .update(projects)
+        .set({ color })
+        .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
+        .returning();
+      if (!projectRow) throw new Error("Project not found");
+      return mapProjectFromDb(projectRow);
     },
     deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);

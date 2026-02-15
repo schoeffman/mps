@@ -295,11 +295,12 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                 {team.members.map((member) => (
                   <tr key={`member-${member.id}`} className="border-b">
                     <td className="sticky left-0 z-10 bg-background px-3 py-1.5 border-r whitespace-nowrap">
-                      {member.id === team.teamLead.id && (
-                        <Badge variant="outline" className="mr-1.5 text-[10px] px-1 py-0">TL</Badge>
-                      )}
                       <RowProjectPicker
                         memberName={member.fullName}
+                        memberId={member.id}
+                        prefix={member.id === team.teamLead.id ? (
+                          <Badge variant="outline" className="mr-1.5 text-[10px] px-1 py-0">TL</Badge>
+                        ) : undefined}
                         projects={projects}
                         projectChipColorMap={projectChipColorMap}
                         onSelectProject={(projectId) => handleRowAssign(member.id, projectId)}
@@ -349,6 +350,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                     <td className="sticky left-0 z-10 bg-background px-3 py-1.5 border-r whitespace-nowrap">
                       <RowProjectPicker
                         memberName={member.fullName}
+                        memberId={member.id}
                         projects={projects}
                         projectChipColorMap={projectChipColorMap}
                         onSelectProject={(projectId) => handleRowAssign(member.id, projectId)}

@@ -12,6 +12,7 @@ interface Project {
   status: string;
   color: string;
   projectType: string;
+  isSystem: boolean;
   members: { id: number; fullName: string }[];
 }
 
@@ -33,11 +34,13 @@ const REMAINING_COLOR = "#e5e7eb"; // gray-200
 const PROJECT_TYPE_COLORS: Record<string, string> = {
   FeatureDevelopment: "#3b82f6", // blue-500
   Maintenance: "#f59e0b", // amber-500
+  Other: "#9ca3af", // gray-400
 };
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
   FeatureDevelopment: "Feature Development",
   Maintenance: "Maintenance",
+  Other: "Other",
 };
 
 interface Slice {
@@ -201,7 +204,7 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
                   style={{ backgroundColor: s.color }}
                 />
                 <span className="inline-flex items-center gap-1">
-                  {project && (
+                  {project && !project.isSystem && (
                     <EditProjectDialog
                       project={project}
                       trigger={

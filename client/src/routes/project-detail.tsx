@@ -49,6 +49,7 @@ const GET_PROJECT = gql`
       status
       color
       projectType
+      isSystem
       jiraProjectKey
       links {
         id
@@ -376,32 +377,34 @@ export default function ProjectDetail() {
           </Link>
         </Button>
         <h1 className="text-2xl font-semibold">{project.name}</h1>
-        <div className="flex gap-1 ml-2">
-          <EditProjectDialog project={project} />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon-xs">
-                <Trash2 />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete project</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete {project.name}? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction asChild>
-                  <Button variant="destructive" onClick={handleDelete}>
-                    Delete
-                  </Button>
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+        {!project.isSystem && (
+          <div className="flex gap-1 ml-2">
+            <EditProjectDialog project={project} />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon-xs">
+                  <Trash2 />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete project</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {project.name}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction asChild>
+                    <Button variant="destructive" onClick={handleDelete}>
+                      Delete
+                    </Button>
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </div>
 
       <div className="mb-6 text-sm text-muted-foreground space-y-1">

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 
 interface Project {
   id: number;
@@ -8,6 +9,8 @@ interface Project {
 
 interface RowProjectPickerProps {
   memberName: string;
+  memberId?: number;
+  prefix?: React.ReactNode;
   projects: Project[];
   projectChipColorMap: Map<number, string>;
   onSelectProject: (projectId: number | null) => void;
@@ -15,18 +18,20 @@ interface RowProjectPickerProps {
 
 export function RowProjectPicker({
   memberName,
+  memberId,
+  prefix,
   projects,
   projectChipColorMap,
   onSelectProject,
 }: RowProjectPickerProps) {
   const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
   const updatePosition = useCallback(() => {
-    if (!buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
     setMenuPos({
       top: rect.bottom + 4,
       left: rect.left,
@@ -50,7 +55,7 @@ export function RowProjectPicker({
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        buttonRef.current?.contains(target) ||
+        triggerRef.current?.contains(target) ||
         menuRef.current?.contains(target)
       )
         return;
@@ -72,14 +77,25 @@ export function RowProjectPicker({
 
   return (
     <>
-      <button
-        ref={buttonRef}
+      <div
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className="hover:underline cursor-pointer text-left"
+        className="block w-full cursor-pointer text-left"
         title="Click to assign a project to all weeks"
       >
-        {memberName}
-      </button>
+        {prefix}
+        {memberId != null ? (
+          <Link
+            to={`/users/${memberId}`}
+            className="hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {memberName}
+          </Link>
+        ) : (
+          memberName
+        )}
+      </div>
       {open &&
         createPortal(
           <div
