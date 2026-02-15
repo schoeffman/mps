@@ -509,7 +509,7 @@ export default function ProjectDetail() {
               <summary className="cursor-pointer select-none">
                 <span className="inline-flex items-center gap-2">
                   <span className="text-lg font-semibold">Project Checklist</span>
-                  <span className="text-sm text-muted-foreground">({doneCount}/{items.length})</span>
+                  <span className="text-sm text-muted-foreground">({doneCount}/{items.length} · {Math.round((doneCount / items.length) * 100)}%)</span>
                 </span>
               </summary>
               <div className="mt-3">
@@ -572,6 +572,9 @@ export default function ProjectDetail() {
         <section className="mt-6">
           <div className="flex items-center gap-2 mb-2">
             <h2 className="text-lg font-semibold">Jira Issues</h2>
+            {hasJiraKey && jiraIssuesData?.jiraIssues && (
+              <span className="text-sm text-muted-foreground">({jiraIssuesData.jiraIssues.length})</span>
+            )}
             {hasJiraKey && (
               <>
                 <Button
@@ -739,6 +742,8 @@ export default function ProjectDetail() {
               </div>
             );
           })()}
+          <details>
+            <summary className="cursor-pointer select-none text-sm text-muted-foreground mb-2">Show issues</summary>
           {jiraLoading ? (
             <p className="text-sm text-muted-foreground">Loading Jira issues...</p>
           ) : jiraError ? (
@@ -850,6 +855,7 @@ export default function ProjectDetail() {
           ) : (
             <p className="text-sm text-muted-foreground">No issues found.</p>
           )}
+          </details>
           </>
           )}
         </section>
