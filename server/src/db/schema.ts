@@ -165,6 +165,17 @@ export const spaceMembers = pgTable("space_members", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [unique().on(table.spaceOwnerId, table.memberAuthId)]);
 
+export const projectChecklistCompletions = pgTable("project_checklist_completions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  itemKey: text("item_key").notNull(),
+  completedBy: text("completed_by").notNull(),
+  completedAt: text("completed_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [unique().on(table.projectId, table.itemKey)]);
+
 export const jiraConfig = pgTable("jira_config", {
   id: serial("id").primaryKey(),
   ownerId: text("owner_id").notNull().unique().references(() => authUser.id),

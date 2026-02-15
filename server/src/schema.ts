@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, projectChecklistCompletions } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
 import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue, searchJiraUsers, assignJiraIssue } from "./lib/jira-client.js";
@@ -258,6 +258,15 @@ export const typeDefs = gql`
     createdAt: String!
   }
 
+  type ProjectChecklistItem {
+    key: String!
+    phase: String!
+    description: String!
+    completed: Boolean!
+    completedBy: String
+    completedAt: String
+  }
+
   type DateRange {
     start: String!
     end: String!
@@ -292,6 +301,7 @@ export const typeDefs = gql`
     jiraIssues(projectId: Int!): [JiraIssue!]!
     jiraTransitions(issueKey: String!): [JiraTransition!]!
     searchJiraUsers(query: String!): [JiraUser!]!
+    projectChecklist(projectId: Int!): [ProjectChecklistItem!]!
   }
 
   input BulkAssignmentInput {
@@ -327,6 +337,7 @@ export const typeDefs = gql`
     removeJiraConfig: Boolean!
     transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
     assignJiraIssue(issueKey: String!, accountId: String): Boolean!
+    toggleProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
     deleteMyAccount: Boolean!
   }
 `;
@@ -372,6 +383,30 @@ const projectTypeFromDb: Record<string, string> = {
   "Feature Development": "FeatureDevelopment",
   Maintenance: "Maintenance",
 };
+
+const CHECKLIST_TEMPLATE = [
+  { key: "wonder-1", phase: "Wonder", description: "Create a Project Poster" },
+  { key: "wonder-2", phase: "Wonder", description: "Create the parent epic to track all tickets" },
+  { key: "wonder-3", phase: "Wonder", description: "Create a Slack channel for the project" },
+  { key: "wonder-4", phase: "Wonder", description: "Create initial designs (if needed)" },
+  { key: "wonder-5", phase: "Wonder", description: "Hold a kickoff meeting" },
+  { key: "explore-1", phase: "Explore", description: "Engineering DRI / feature lead reviews the project details / designs" },
+  { key: "explore-2", phase: "Explore", description: "Hold a design review meeting if more detail is needed" },
+  { key: "explore-3", phase: "Explore", description: "Create a \"Decision Registry\" if this is a large project" },
+  { key: "explore-4", phase: "Explore", description: "Create a project breakdown list for all the tasks" },
+  { key: "explore-5", phase: "Explore", description: "Create any Decision documents necessary to determine engineering approaches" },
+  { key: "explore-6", phase: "Explore", description: "Determine if we need any teams to commit for dependencies identified" },
+  { key: "explore-7", phase: "Explore", description: "Estimate the engineering work" },
+  { key: "explore-7a", phase: "Explore", description: "Create an instrumentation spec which covers what we want to track with analytics events (for product-driven projects)" },
+  { key: "explore-8", phase: "Explore", description: "Create timeline gantt" },
+  { key: "explore-9", phase: "Explore", description: "Engineering and product collaborate to create phases/milestones, if warranted" },
+  { key: "explore-10", phase: "Explore", description: "Convert the estimates into tickets under the epic" },
+  { key: "explore-11", phase: "Explore", description: "Check in with your manager to review before moving onto the next phases" },
+  { key: "make-1", phase: "Make", description: "Schedule a weekly (or fortnightly) sync meeting with stakeholders" },
+  { key: "make-2", phase: "Make", description: "Create a roll-out plan" },
+  { key: "make-3", phase: "Make", description: "Schedule and hold a bug-bash to identify any outstanding bugs before launch" },
+  { key: "make-4", phase: "Make", description: "Roll it out!" },
+];
 
 function mapUserFromDb(row: typeof users.$inferSelect) {
   return {
@@ -694,6 +729,22 @@ export const resolvers = {
       const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
       if (!config) throw new Error("Jira is not configured");
       return searchJiraUsers(config.domain, config.email, config.apiToken, query);
+    },
+    projectChecklist: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      const completions = await db.select().from(projectChecklistCompletions).where(eq(projectChecklistCompletions.projectId, projectId));
+      const completionMap = new Map(completions.map((c) => [c.itemKey, c]));
+      return CHECKLIST_TEMPLATE.map((item) => {
+        const completion = completionMap.get(item.key);
+        return {
+          ...item,
+          completed: !!completion,
+          completedBy: completion?.completedBy ?? null,
+          completedAt: completion?.completedAt ?? null,
+        };
+      });
     },
   },
   Mutation: {
@@ -1144,6 +1195,21 @@ export const resolvers = {
       const deleted = await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceOwnerId, user.id), eq(spaceMembers.memberAuthId, memberAuthId))).returning();
       return deleted.length > 0;
     },
+    toggleProjectChecklistItem: async (_: unknown, { projectId, itemKey }: { projectId: number; itemKey: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const { user } = requireAuth(context);
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      if (!CHECKLIST_TEMPLATE.some((t) => t.key === itemKey)) throw new Error("Invalid checklist item key");
+      const [existing] = await db.select().from(projectChecklistCompletions).where(and(eq(projectChecklistCompletions.projectId, projectId), eq(projectChecklistCompletions.itemKey, itemKey)));
+      if (existing) {
+        await db.delete(projectChecklistCompletions).where(eq(projectChecklistCompletions.id, existing.id));
+        return false;
+      }
+      const today = new Date().toISOString().split("T")[0];
+      await db.insert(projectChecklistCompletions).values({ projectId, itemKey, completedBy: user.email, completedAt: today });
+      return true;
+    },
     deleteMyAccount: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
 
@@ -1164,8 +1230,9 @@ export const resolvers = {
       // 2. Schedules
       await db.delete(schedules).where(eq(schedules.ownerId, ownerId));
 
-      // 3. Project members (references projects, users)
+      // 3. Project checklist completions and project members (reference projects)
       const ownerProjectIds = db.select({ id: projects.id }).from(projects).where(eq(projects.ownerId, ownerId));
+      await db.delete(projectChecklistCompletions).where(inArray(projectChecklistCompletions.projectId, ownerProjectIds));
       await db.delete(projectMembers).where(inArray(projectMembers.projectId, ownerProjectIds));
 
       // 4. Projects

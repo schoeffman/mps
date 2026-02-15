@@ -6,6 +6,7 @@ import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Load
 import { GanttChart, type GanttTask } from "@/components/gantt-chart";
 import { scheduleIssues, type JiraIssue, type Assignment } from "@/lib/gantt-scheduler";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -153,6 +154,25 @@ const GET_PROJECT_ASSIGNMENTS = gql`
   }
 `;
 
+const PROJECT_CHECKLIST = gql`
+  query ProjectChecklist($projectId: Int!) {
+    projectChecklist(projectId: $projectId) {
+      key
+      phase
+      description
+      completed
+      completedBy
+      completedAt
+    }
+  }
+`;
+
+const TOGGLE_CHECKLIST_ITEM = gql`
+  mutation ToggleProjectChecklistItem($projectId: Int!, $itemKey: String!) {
+    toggleProjectChecklistItem(projectId: $projectId, itemKey: $itemKey)
+  }
+`;
+
 const enumLabels: Record<string, string> = {
   ProductManagement: "Product Management",
   DataScience: "Data Science",
@@ -197,6 +217,13 @@ export default function ProjectDetail() {
   const { data: assignmentsData } = useQuery(GET_PROJECT_ASSIGNMENTS, {
     variables: { projectId },
     fetchPolicy: "cache-and-network",
+  });
+
+  const { data: checklistData } = useQuery(PROJECT_CHECKLIST, {
+    variables: { projectId },
+  });
+  const [toggleChecklistItem] = useMutation(TOGGLE_CHECKLIST_ITEM, {
+    refetchQueries: [{ query: PROJECT_CHECKLIST, variables: { projectId } }],
   });
 
   const [linkUrl, setLinkUrl] = useState("");
@@ -458,6 +485,64 @@ export default function ProjectDetail() {
           </Button>
         </form>
       </section>
+
+      {/* Checklist Section */}
+      {checklistData?.projectChecklist && (() => {
+        const items = checklistData.projectChecklist as { key: string; phase: string; description: string; completed: boolean; completedBy: string | null; completedAt: string | null }[];
+        const totalCompleted = items.filter((i) => i.completed).length;
+        const phases = ["Wonder", "Explore", "Make"];
+        return (
+          <section className="mt-6">
+            <details>
+              <summary className="cursor-pointer select-none">
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-lg font-semibold">Project Checklist</span>
+                  <span className="text-sm text-muted-foreground">({totalCompleted}/{items.length})</span>
+                </span>
+              </summary>
+              <div className="mt-3">
+                {phases.map((phase) => {
+                  const phaseItems = items.filter((i) => i.phase === phase);
+                  const completedCount = phaseItems.filter((i) => i.completed).length;
+                  return (
+                    <div key={phase} className="mb-4">
+                      <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                        {phase} ({completedCount}/{phaseItems.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {phaseItems.map((item) => (
+                          <label
+                            key={item.key}
+                            className="flex items-start gap-2 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={item.completed}
+                              onCheckedChange={() =>
+                                toggleChecklistItem({ variables: { projectId, itemKey: item.key } })
+                              }
+                              className="mt-0.5"
+                            />
+                            <div className="flex flex-col">
+                              <span className={item.completed ? "line-through text-muted-foreground" : "text-sm"}>
+                                {item.description}
+                              </span>
+                              {item.completed && item.completedBy && (
+                                <span className="text-xs text-muted-foreground">
+                                  {item.completedBy} on {new Date(item.completedAt + "T00:00:00").toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </section>
+        );
+      })()}
 
       {/* Jira Issues Section */}
         <section className="mt-6">
