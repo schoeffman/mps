@@ -345,6 +345,7 @@ export const typeDefs = gql`
     status: ProjectStatus!
     assignees: [String!]!
     lastUpdateDate: String
+    atlassianStatus: String
   }
 
   type LeaveAssignment {
@@ -1037,19 +1038,19 @@ export const resolvers = {
 
       // Fetch Atlassian update dates for projects that have a key
       const projectsWithAtlassian = [...byProject.entries()].filter(([, d]) => d.atlassianProjectKey);
-      let atlassianUpdates = new Map<number, string | null>();
+      let atlassianData = new Map<number, { lastUpdateDate: string | null; status: string | null }>();
       if (projectsWithAtlassian.length > 0) {
         const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
         if (config) {
           const results = await Promise.allSettled(
             projectsWithAtlassian.map(async ([id, d]) => {
               const data = await fetchAtlassianProject(config.domain, config.email, config.apiToken, d.atlassianProjectKey!);
-              return [id, data.latestUpdate?.date ?? null] as const;
+              return [id, { lastUpdateDate: data.latestUpdate?.date ?? null, status: data.status ?? null }] as const;
             }),
           );
           for (const result of results) {
             if (result.status === "fulfilled") {
-              atlassianUpdates.set(result.value[0], result.value[1]);
+              atlassianData.set(result.value[0], result.value[1]);
             }
           }
         }
@@ -1061,7 +1062,8 @@ export const resolvers = {
         color: data.color,
         status: data.status,
         assignees: data.assignees,
-        lastUpdateDate: atlassianUpdates.get(projectId) ?? null,
+        lastUpdateDate: atlassianData.get(projectId)?.lastUpdateDate ?? null,
+        atlassianStatus: atlassianData.get(projectId)?.status ?? null,
       }));
     },
   },
