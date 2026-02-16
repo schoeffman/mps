@@ -1,7 +1,8 @@
 import { useMemo, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
-import { ArrowLeft, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Trash2, Download, TriangleAlert } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { GET_SCHEDULES } from "@/routes/schedules";
 import { EditScheduleDialog } from "@/components/edit-schedule-dialog";
@@ -134,6 +135,20 @@ export default function ScheduleDetail() {
     return Math.round(((totalSlots - assigned) / totalSlots) * 100);
   }, [detailData, totalSlots]);
 
+  const onCallGaps = useMemo(() => {
+    if (!detailData || weekStarts.length === 0) return [];
+    const onCallProject = detailData.projects.find(
+      (p: { name: string; isSystem: boolean }) => p.name === "On Call" && p.isSystem
+    );
+    if (!onCallProject) return [];
+    const onCallWeeks = new Set(
+      detailData.scheduleAssignments
+        .filter((a: { projectId: number }) => a.projectId === onCallProject.id)
+        .map((a: { weekStart: string }) => a.weekStart)
+    );
+    return weekStarts.filter((w) => !onCallWeeks.has(w));
+  }, [detailData, weekStarts]);
+
   const [deleteSchedule] = useMutation(DELETE_SCHEDULE, {
     refetchQueries: [{ query: GET_SCHEDULES }],
   });
@@ -262,6 +277,16 @@ export default function ScheduleDetail() {
         <p className="text-sm text-muted-foreground">
           Available capacity: <span className="font-medium text-foreground">{availableCapacity}%</span>
         </p>
+      )}
+
+      {onCallGaps.length > 0 && (
+        <Alert className="bg-amber-50 dark:bg-amber-950">
+          <TriangleAlert className="text-yellow-600" />
+          <AlertTitle>On Call coverage gap</AlertTitle>
+          <AlertDescription>
+            {onCallGaps.length} {onCallGaps.length === 1 ? "week has" : "weeks have"} no one assigned to On Call
+          </AlertDescription>
+        </Alert>
       )}
 
       {detailLoading && <p>Loading grid...</p>}

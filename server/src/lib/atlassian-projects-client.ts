@@ -46,6 +46,9 @@ export async function fetchAtlassianProject(
             end
           }
         }
+        state {
+          label
+        }
         updates(first: 1) {
           edges {
             node {
@@ -92,7 +95,7 @@ export async function fetchAtlassianProject(
 
   return {
     name: project.name,
-    status: null,
+    status: project.state?.label ?? null,
     dueDate: dueEnd,
     latestUpdate: updateNode
       ? {

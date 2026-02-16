@@ -563,7 +563,14 @@ export default function ProjectDetail() {
                 {atlassianData.atlassianProject.name}
               </p>
               {atlassianData.atlassianProject.status && (
-                <p><span className="text-muted-foreground">Status: </span>{atlassianData.atlassianProject.status}</p>
+                <p>
+                  <span className="text-muted-foreground">Status: </span>
+                  <span className={
+                    atlassianData.atlassianProject.status.toLowerCase() === "on track" ? "text-green-600" :
+                    atlassianData.atlassianProject.status.toLowerCase() === "at risk" ? "text-yellow-500" :
+                    atlassianData.atlassianProject.status.toLowerCase() === "off track" ? "text-red-500" : ""
+                  }>{atlassianData.atlassianProject.status}</span>
+                </p>
               )}
               {atlassianData.atlassianProject.dueDate && (
                 <p><span className="text-muted-foreground">Due Date: </span>{new Date(atlassianData.atlassianProject.dueDate).toLocaleDateString()}</p>

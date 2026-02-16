@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 
 interface Project {
   id: number;
@@ -79,22 +80,29 @@ export function RowProjectPicker({
     <>
       <div
         ref={triggerRef}
-        onClick={() => setOpen(!open)}
-        className="block w-full cursor-pointer text-left"
-        title="Click to assign a project to all weeks"
+        className="flex items-center justify-between w-full"
       >
-        {prefix}
-        {memberId != null ? (
-          <Link
-            to={`/users/${memberId}`}
-            className="hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {memberName}
-          </Link>
-        ) : (
-          memberName
-        )}
+        <span>
+          {prefix}
+          {memberId != null ? (
+            <Link
+              to={`/users/${memberId}`}
+              className="hover:underline"
+            >
+              {memberName}
+            </Link>
+          ) : (
+            memberName
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="shrink-0 ml-1.5 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+          title="Assign project to all weeks"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
       </div>
       {open &&
         createPortal(
