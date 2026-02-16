@@ -285,6 +285,11 @@ export const typeDefs = gql`
     dateRanges: [DateRange!]!
   }
 
+  type UserScheduleEntry {
+    project: Project!
+    dateRanges: [DateRange!]!
+  }
+
   type Query {
     hello: String
     users: [User!]!
@@ -300,6 +305,8 @@ export const typeDefs = gql`
     workHistoryDates(startDate: String!, endDate: String!): [String!]!
     workHistoryAdjacentDates(date: String!): WorkHistoryAdjacentDates!
     projectAssignments(projectId: Int!): [ProjectAssignment!]!
+    userSchedule(userId: Int!): [UserScheduleEntry!]!
+    userWorkHistory(userId: Int!, limit: Int): [WorkHistoryEntry!]!
     me: SessionInfo
     mySpaces: [Space!]!
     spaceMembers: [SpaceMember!]!
@@ -706,6 +713,84 @@ export const resolvers = {
       }
 
       return results;
+    },
+    userSchedule: async (_: unknown, { userId }: { userId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      // Verify user ownership
+      const [userRow] = await db.select().from(users).where(and(eq(users.id, userId), eq(users.ownerId, ownerId)));
+      if (!userRow) throw new Error("User not found");
+
+      // Get all upcoming assignments for this user (from current week onwards)
+      const today = new Date().toISOString().split("T")[0];
+      const rows = await db
+        .select({
+          projectId: scheduleAssignments.projectId,
+          weekStart: scheduleAssignments.weekStart,
+          scheduleId: scheduleAssignments.scheduleId,
+          scheduleName: schedules.name,
+        })
+        .from(scheduleAssignments)
+        .innerJoin(schedules, eq(scheduleAssignments.scheduleId, schedules.id))
+        .where(and(
+          eq(scheduleAssignments.userId, userId),
+          gte(scheduleAssignments.weekStart, today),
+        ))
+        .orderBy(asc(scheduleAssignments.weekStart));
+
+      if (rows.length === 0) return [];
+
+      // Group by projectId, then by scheduleId
+      const byProject = new Map<number, { bySchedule: Map<number, { scheduleName: string; weeks: string[] }> }>();
+      for (const row of rows) {
+        if (!byProject.has(row.projectId)) {
+          byProject.set(row.projectId, { bySchedule: new Map() });
+        }
+        const entry = byProject.get(row.projectId)!;
+        if (!entry.bySchedule.has(row.scheduleId)) {
+          entry.bySchedule.set(row.scheduleId, { scheduleName: row.scheduleName, weeks: [] });
+        }
+        entry.bySchedule.get(row.scheduleId)!.weeks.push(row.weekStart);
+      }
+
+      const results = [];
+      for (const [projectId, { bySchedule }] of byProject) {
+        const [projectRow] = await db.select().from(projects).where(eq(projects.id, projectId));
+        if (!projectRow) continue;
+        const dateRanges = mergeWeekRanges(bySchedule);
+        results.push({ project: await mapProjectFromDb(projectRow), dateRanges });
+      }
+
+      return results;
+    },
+    userWorkHistory: async (_: unknown, { userId, limit: rowLimit }: { userId: number; limit?: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [userRow] = await db.select().from(users).where(and(eq(users.id, userId), eq(users.ownerId, ownerId)));
+      if (!userRow) throw new Error("User not found");
+
+      const rows = await db
+        .select()
+        .from(workHistory)
+        .where(and(eq(workHistory.ownerId, ownerId), eq(workHistory.userId, userId)))
+        .orderBy(desc(workHistory.date))
+        .limit(rowLimit ?? 10);
+
+      return Promise.all(
+        rows.map(async (row) => {
+          const [projectRow] = await db.select().from(projects).where(eq(projects.id, row.projectId));
+          let scheduleName = "Manually Entered";
+          if (!row.manuallyEdited) {
+            const [scheduleRow] = await db.select().from(schedules).where(eq(schedules.id, row.scheduleId));
+            scheduleName = scheduleRow?.name ?? "Unknown";
+          }
+          return {
+            id: row.id,
+            date: row.date,
+            user: mapUserFromDb(userRow),
+            project: projectRow ? { id: projectRow.id, name: projectRow.name, color: projectRow.color, targetDate: projectRow.targetDate, status: projectRow.status, createdAt: projectRow.createdAt.toISOString(), dri: null, members: [] } : null,
+            scheduleName,
+          };
+        }),
+      );
     },
     me: (_: unknown, __: unknown, context: Context) => {
       if (!context.session) return null;
