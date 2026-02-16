@@ -333,6 +333,31 @@ export const typeDefs = gql`
     searchJiraUsers(query: String!): [JiraUser!]!
     atlassianProject(projectId: Int!): AtlassianProjectData
     projectChecklist(projectId: Int!): [ProjectChecklistItem!]!
+    leaveAssignments(startDate: String!, endDate: String!): [LeaveAssignment!]!
+    onCallAssignments(startDate: String!, endDate: String!): [OnCallAssignment!]!
+    scheduledProjects(weekStart: String!): [ScheduledProject!]!
+  }
+
+  type ScheduledProject {
+    projectId: Int!
+    projectName: String!
+    color: String!
+    status: ProjectStatus!
+    assignees: [String!]!
+    lastUpdateDate: String
+  }
+
+  type LeaveAssignment {
+    userId: Int!
+    userName: String!
+    projectName: String!
+    weekStart: String!
+  }
+
+  type OnCallAssignment {
+    userId: Int!
+    userName: String!
+    weekStart: String!
   }
 
   input BulkAssignmentInput {
@@ -907,6 +932,137 @@ export const resolvers = {
           completedAt: completion?.completedAt ?? null,
         };
       });
+    },
+    leaveAssignments: async (_: unknown, { startDate, endDate }: { startDate: string; endDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const ownerSchedules = await db
+        .select({ id: schedules.id })
+        .from(schedules)
+        .where(eq(schedules.ownerId, ownerId));
+      if (ownerSchedules.length === 0) return [];
+      const scheduleIds = ownerSchedules.map((s) => s.id);
+
+      const rows = await db
+        .select({
+          userId: scheduleAssignments.userId,
+          userName: users.fullName,
+          projectName: projects.name,
+          weekStart: scheduleAssignments.weekStart,
+        })
+        .from(scheduleAssignments)
+        .innerJoin(projects, eq(scheduleAssignments.projectId, projects.id))
+        .innerJoin(users, eq(scheduleAssignments.userId, users.id))
+        .where(
+          and(
+            inArray(scheduleAssignments.scheduleId, scheduleIds),
+            gte(scheduleAssignments.weekStart, startDate),
+            lte(scheduleAssignments.weekStart, endDate),
+            eq(projects.isSystem, true),
+            or(
+              eq(projects.name, "Leave (Standard)"),
+              eq(projects.name, "Leave (Extended)"),
+            ),
+          ),
+        );
+
+      return rows;
+    },
+    onCallAssignments: async (_: unknown, { startDate, endDate }: { startDate: string; endDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const ownerSchedules = await db
+        .select({ id: schedules.id })
+        .from(schedules)
+        .where(eq(schedules.ownerId, ownerId));
+      if (ownerSchedules.length === 0) return [];
+      const scheduleIds = ownerSchedules.map((s) => s.id);
+
+      const rows = await db
+        .select({
+          userId: scheduleAssignments.userId,
+          userName: users.fullName,
+          weekStart: scheduleAssignments.weekStart,
+        })
+        .from(scheduleAssignments)
+        .innerJoin(projects, eq(scheduleAssignments.projectId, projects.id))
+        .innerJoin(users, eq(scheduleAssignments.userId, users.id))
+        .where(
+          and(
+            inArray(scheduleAssignments.scheduleId, scheduleIds),
+            gte(scheduleAssignments.weekStart, startDate),
+            lte(scheduleAssignments.weekStart, endDate),
+            eq(projects.isSystem, true),
+            eq(projects.name, "On Call"),
+          ),
+        );
+
+      return rows;
+    },
+    scheduledProjects: async (_: unknown, { weekStart }: { weekStart: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const ownerSchedules = await db
+        .select({ id: schedules.id })
+        .from(schedules)
+        .where(eq(schedules.ownerId, ownerId));
+      if (ownerSchedules.length === 0) return [];
+      const scheduleIds = ownerSchedules.map((s) => s.id);
+
+      const rows = await db
+        .select({
+          projectId: projects.id,
+          projectName: projects.name,
+          color: projects.color,
+          status: projects.status,
+          atlassianProjectKey: projects.atlassianProjectKey,
+          userName: users.fullName,
+        })
+        .from(scheduleAssignments)
+        .innerJoin(projects, eq(scheduleAssignments.projectId, projects.id))
+        .innerJoin(users, eq(scheduleAssignments.userId, users.id))
+        .where(
+          and(
+            inArray(scheduleAssignments.scheduleId, scheduleIds),
+            eq(scheduleAssignments.weekStart, weekStart),
+            eq(projects.isSystem, false),
+          ),
+        )
+        .orderBy(asc(projects.name), asc(users.fullName));
+
+      const byProject = new Map<number, { projectName: string; color: string; status: string; atlassianProjectKey: string | null; assignees: string[] }>();
+      for (const row of rows) {
+        if (!byProject.has(row.projectId)) {
+          byProject.set(row.projectId, { projectName: row.projectName, color: row.color, status: row.status, atlassianProjectKey: row.atlassianProjectKey, assignees: [] });
+        }
+        byProject.get(row.projectId)!.assignees.push(row.userName);
+      }
+
+      // Fetch Atlassian update dates for projects that have a key
+      const projectsWithAtlassian = [...byProject.entries()].filter(([, d]) => d.atlassianProjectKey);
+      let atlassianUpdates = new Map<number, string | null>();
+      if (projectsWithAtlassian.length > 0) {
+        const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+        if (config) {
+          const results = await Promise.allSettled(
+            projectsWithAtlassian.map(async ([id, d]) => {
+              const data = await fetchAtlassianProject(config.domain, config.email, config.apiToken, d.atlassianProjectKey!);
+              return [id, data.latestUpdate?.date ?? null] as const;
+            }),
+          );
+          for (const result of results) {
+            if (result.status === "fulfilled") {
+              atlassianUpdates.set(result.value[0], result.value[1]);
+            }
+          }
+        }
+      }
+
+      return [...byProject.entries()].map(([projectId, data]) => ({
+        projectId,
+        projectName: data.projectName,
+        color: data.color,
+        status: data.status,
+        assignees: data.assignees,
+        lastUpdateDate: atlassianUpdates.get(projectId) ?? null,
+      }));
     },
   },
   Mutation: {

@@ -1,5 +1,5 @@
 import { NavLink, Link, useNavigate } from "react-router-dom";
-import { Moon, Sun, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut } from "lucide-react";
+import { Moon, Sun, LayoutDashboard, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
@@ -33,6 +33,14 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/" end className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                    <LayoutDashboard className="size-4" />
+                    Dashboard
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink to="/users" className={({ isActive }) => isActive ? "font-semibold" : ""}>
