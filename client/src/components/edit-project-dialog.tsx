@@ -36,6 +36,7 @@ const UPDATE_PROJECT = gql`
       color
       projectType
       jiraProjectKey
+      atlassianProjectKey
       createdAt
     }
   }
@@ -59,6 +60,7 @@ interface EditProjectDialogProps {
     color: string;
     projectType: string;
     jiraProjectKey?: string | null;
+    atlassianProjectKey?: string | null;
   };
   trigger?: React.ReactNode;
 }
@@ -72,6 +74,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
   const [projectType, setProjectType] = useState(project.projectType);
   const [driId, setDriId] = useState<string>(String(project.dri.id));
   const [jiraProjectKey, setJiraProjectKey] = useState(project.jiraProjectKey ?? "");
+  const [atlassianProjectKey, setAtlassianProjectUrl] = useState(project.atlassianProjectKey ?? "");
 
   const { data: usersData } = useQuery(GET_USERS);
   const { data: jiraConfigData } = useQuery(JIRA_CONFIG);
@@ -89,6 +92,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setProjectType(project.projectType);
     setDriId(String(project.dri.id));
     setJiraProjectKey(project.jiraProjectKey ?? "");
+    setAtlassianProjectUrl(project.atlassianProjectKey ?? "");
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -103,7 +107,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, color, projectType, jiraProjectKey: jiraProjectKey.trim() || null },
+        input: { name, targetDate, driId: Number(driId), status, color, projectType, jiraProjectKey: jiraProjectKey.trim() || null, atlassianProjectKey: atlassianProjectKey.trim() || null },
       },
     });
     setOpen(false);
@@ -207,15 +211,26 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
           </div>
 
           {jiraConfigData?.jiraConfig && (
-            <div className="grid gap-2">
-              <Label htmlFor="edit-jiraProjectKey">Jira Project Key</Label>
-              <Input
-                id="edit-jiraProjectKey"
-                placeholder="e.g. MPS"
-                value={jiraProjectKey}
-                onChange={(e) => setJiraProjectKey(e.target.value)}
-              />
-            </div>
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-jiraProjectKey">Jira Project Key</Label>
+                <Input
+                  id="edit-jiraProjectKey"
+                  placeholder="e.g. MPS"
+                  value={jiraProjectKey}
+                  onChange={(e) => setJiraProjectKey(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-atlassianProjectKey">Atlassian Project Key</Label>
+                <Input
+                  id="edit-atlassianProjectKey"
+                  placeholder="e.g. ATLAS-21467"
+                  value={atlassianProjectKey}
+                  onChange={(e) => setAtlassianProjectUrl(e.target.value)}
+                />
+              </div>
+            </>
           )}
 
           <Button

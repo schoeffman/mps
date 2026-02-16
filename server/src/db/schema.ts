@@ -97,6 +97,7 @@ export const projects = pgTable("projects", {
   projectType: text("project_type").notNull().default("Feature Development"),
   isSystem: boolean("is_system").notNull().default(false),
   jiraProjectKey: text("jira_project_key"),
+  atlassianProjectKey: text("atlassian_project_key"),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -51,6 +51,7 @@ const GET_PROJECT = gql`
       projectType
       isSystem
       jiraProjectKey
+      atlassianProjectKey
       links {
         id
         url
@@ -134,6 +135,21 @@ const SEARCH_JIRA_USERS = gql`
 const ASSIGN_JIRA_ISSUE = gql`
   mutation AssignJiraIssue($issueKey: String!, $accountId: String) {
     assignJiraIssue(issueKey: $issueKey, accountId: $accountId)
+  }
+`;
+
+const GET_ATLASSIAN_PROJECT = gql`
+  query GetAtlassianProject($projectId: Int!) {
+    atlassianProject(projectId: $projectId) {
+      name
+      status
+      dueDate
+      latestUpdate {
+        status
+        summary
+        date
+      }
+    }
   }
 `;
 
@@ -284,6 +300,14 @@ export default function ProjectDetail() {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }, [jiraColWidths]);
+
+  const hasAtlassianKey = data?.project?.atlassianProjectKey;
+  const [atlassianRefreshing, setAtlassianRefreshing] = useState(false);
+  const { data: atlassianData, loading: atlassianLoading, error: atlassianError, refetch: refetchAtlassian } = useQuery(GET_ATLASSIAN_PROJECT, {
+    variables: { projectId },
+    skip: !hasAtlassianKey,
+    fetchPolicy: "cache-and-network",
+  });
 
   const hasJiraKey = data?.project?.jiraProjectKey;
   const { data: jiraConfigData, loading: jiraConfigLoading } = useQuery(JIRA_CONFIG_FOR_PROJECT);
@@ -505,6 +529,67 @@ export default function ProjectDetail() {
           </Button>
         </form>
       </section>
+
+      {/* Atlassian Project Section */}
+      {hasAtlassianKey && (
+        <section className="mt-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-lg font-semibold">Atlassian Project</h2>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={atlassianRefreshing}
+              onClick={async () => {
+                setAtlassianRefreshing(true);
+                try {
+                  await refetchAtlassian();
+                } finally {
+                  setAtlassianRefreshing(false);
+                }
+              }}
+              title="Refresh Atlassian project data"
+            >
+              <RefreshCw className={atlassianRefreshing ? "animate-spin" : ""} />
+            </Button>
+          </div>
+          {atlassianLoading && !atlassianData ? (
+            <p className="text-sm text-muted-foreground">Loading Atlassian project...</p>
+          ) : atlassianError ? (
+            <p className="text-sm text-destructive">Failed to load: {atlassianError.message}</p>
+          ) : atlassianData?.atlassianProject ? (
+            <div className="text-sm space-y-1.5">
+              <p>
+                <span className="text-muted-foreground">Name: </span>
+                {atlassianData.atlassianProject.name}
+              </p>
+              {atlassianData.atlassianProject.status && (
+                <p><span className="text-muted-foreground">Status: </span>{atlassianData.atlassianProject.status}</p>
+              )}
+              {atlassianData.atlassianProject.dueDate && (
+                <p><span className="text-muted-foreground">Due Date: </span>{new Date(atlassianData.atlassianProject.dueDate).toLocaleDateString()}</p>
+              )}
+              {atlassianData.atlassianProject.latestUpdate && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer select-none text-sm text-muted-foreground">
+                    Latest Update
+                    {atlassianData.atlassianProject.latestUpdate.date && (
+                      <span className="ml-1.5">· {new Date(atlassianData.atlassianProject.latestUpdate.date).toLocaleDateString()}</span>
+                    )}
+                  </summary>
+                  <div className="mt-2 rounded-lg border p-3">
+                    {atlassianData.atlassianProject.latestUpdate.status && (
+                      <p className="text-xs text-muted-foreground mb-1">Status: {atlassianData.atlassianProject.latestUpdate.status}</p>
+                    )}
+                    {atlassianData.atlassianProject.latestUpdate.summary && (
+                      <AdfRenderer document={atlassianData.atlassianProject.latestUpdate.summary} />
+                    )}
+                  </div>
+                </details>
+              )}
+            </div>
+          ) : null}
+        </section>
+      )}
 
       {/* Checklist Section */}
       {checklistData?.projectChecklist && (() => {

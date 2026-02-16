@@ -17,6 +17,7 @@ export const GET_PROJECTS = gql`
       projectType
       isSystem
       jiraProjectKey
+      atlassianProjectKey
     }
   }
 `;

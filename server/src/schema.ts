@@ -5,6 +5,7 @@ import { users, teams, teamMembers, projects, projectMembers, projectLinks, sche
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
 import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue, searchJiraUsers, assignJiraIssue } from "./lib/jira-client.js";
+import { fetchAtlassianProject } from "./lib/atlassian-projects-client.js";
 
 export interface Context {
   session: {
@@ -139,6 +140,7 @@ export const typeDefs = gql`
     projectType: ProjectType!
     isSystem: Boolean!
     jiraProjectKey: String
+    atlassianProjectKey: String
     members: [User!]!
     links: [ProjectLink!]!
     createdAt: String!
@@ -173,6 +175,19 @@ export const typeDefs = gql`
     emailAddress: String
   }
 
+  type AtlassianProjectUpdate {
+    status: String
+    summary: String
+    date: String
+  }
+
+  type AtlassianProjectData {
+    name: String!
+    status: String
+    dueDate: String
+    latestUpdate: AtlassianProjectUpdate
+  }
+
   input CreateProjectInput {
     name: String!
     targetDate: String!
@@ -181,6 +196,7 @@ export const typeDefs = gql`
     color: String!
     projectType: ProjectType
     jiraProjectKey: String
+    atlassianProjectKey: String
   }
 
   input UpdateProjectInput {
@@ -191,6 +207,7 @@ export const typeDefs = gql`
     color: String!
     projectType: ProjectType!
     jiraProjectKey: String
+    atlassianProjectKey: String
   }
 
   type Schedule {
@@ -314,6 +331,7 @@ export const typeDefs = gql`
     jiraIssues(projectId: Int!): [JiraIssue!]!
     jiraTransitions(issueKey: String!): [JiraTransition!]!
     searchJiraUsers(query: String!): [JiraUser!]!
+    atlassianProject(projectId: Int!): AtlassianProjectData
     projectChecklist(projectId: Int!): [ProjectChecklistItem!]!
   }
 
@@ -524,6 +542,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     projectType: projectTypeFromDb[projectRow.projectType] ?? "FeatureDevelopment",
     isSystem: projectRow.isSystem,
     jiraProjectKey: projectRow.jiraProjectKey ?? null,
+    atlassianProjectKey: projectRow.atlassianProjectKey ?? null,
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     links: linkRows.map((l) => ({ id: l.id, url: l.url, createdAt: l.createdAt.toISOString() })),
     createdAt: projectRow.createdAt.toISOString(),
@@ -861,6 +880,17 @@ export const resolvers = {
       if (!config) throw new Error("Jira is not configured");
       return searchJiraUsers(config.domain, config.email, config.apiToken, query);
     },
+    atlassianProject: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
+      if (!project) throw new Error("Project not found");
+      if (!project.atlassianProjectKey) return null;
+
+      const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!config) throw new Error("Jira/Atlassian is not configured");
+
+      return fetchAtlassianProject(config.domain, config.email, config.apiToken, project.atlassianProjectKey);
+    },
     projectChecklist: async (_: unknown, { projectId }: { projectId: number }, context: Context) => {
       const ownerId = getOwnerId(context);
       const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerId, ownerId)));
@@ -993,7 +1023,7 @@ export const resolvers = {
     },
     createProject: async (
       _: unknown,
-      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string; jiraProjectKey?: string } },
+      { input }: { input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType?: string; jiraProjectKey?: string; atlassianProjectKey?: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -1008,6 +1038,7 @@ export const resolvers = {
           color: input.color,
           projectType: projectTypeToDb[input.projectType ?? "FeatureDevelopment"] ?? "Feature Development",
           jiraProjectKey: input.jiraProjectKey ?? null,
+          atlassianProjectKey: input.atlassianProjectKey ?? null,
           ownerId,
         })
         .returning();
@@ -1020,7 +1051,7 @@ export const resolvers = {
     },
     updateProject: async (
       _: unknown,
-      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string; jiraProjectKey?: string } },
+      { id, input }: { id: number; input: { name: string; targetDate: string; driId: number; status: string; color: string; projectType: string; jiraProjectKey?: string; atlassianProjectKey?: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -1039,6 +1070,7 @@ export const resolvers = {
           color: input.color,
           projectType: projectTypeToDb[input.projectType] ?? "Feature Development",
           jiraProjectKey: input.jiraProjectKey ?? null,
+          atlassianProjectKey: input.atlassianProjectKey ?? null,
         })
         .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
         .returning();
