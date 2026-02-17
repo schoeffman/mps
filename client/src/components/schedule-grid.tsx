@@ -7,6 +7,7 @@ import { getProjectColor } from "@/lib/project-colors";
 import { Badge } from "@/components/ui/badge";
 import { ScheduleCell } from "./schedule-cell";
 import { RowProjectPicker } from "./row-project-picker";
+import { ColumnProjectPicker } from "./column-project-picker";
 
 const SET_SCHEDULE_ASSIGNMENT = gql`
   mutation SetScheduleAssignment($scheduleId: Int!, $userId: Int!, $weekStart: String!, $projectId: Int) {
@@ -135,6 +136,19 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
         projectId,
       }))
     );
+    bulkSetAssignments({ variables: { scheduleId, assignments: assignmentInputs } });
+  };
+
+  const handleColumnAssign = (weekStart: string, projectId: number | null) => {
+    const allUserIds = [
+      ...teams.flatMap((t) => t.members.map((m) => m.id)),
+      ...unassignedUsers.map((u) => u.id),
+    ];
+    const assignmentInputs = allUserIds.map((userId) => ({
+      userId,
+      weekStart,
+      projectId,
+    }));
     bulkSetAssignments({ variables: { scheduleId, assignments: assignmentInputs } });
   };
 
@@ -277,7 +291,12 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                   const isCurrent = ws === currentWeekStart;
                   return (
                     <th key={ws} {...(isCurrent ? { "data-current-week": true } : {})} className={`sticky top-0 z-10 px-2 py-2 text-center font-medium min-w-[130px] border-b border-r ${isCurrent ? "bg-blue-100 dark:bg-blue-950/40 border-x-2 border-x-blue-400 dark:border-x-blue-500" : "bg-muted"}`}>
-                      {formatWeekHeader(ws)}
+                      <ColumnProjectPicker
+                        label={formatWeekHeader(ws)}
+                        projects={assignableProjects}
+                        projectChipColorMap={projectChipColorMap}
+                        onSelectProject={(projectId) => handleColumnAssign(ws, projectId)}
+                      />
                       {holidays.length > 0 && (
                         <Tooltip>
                           <TooltipTrigger asChild>
