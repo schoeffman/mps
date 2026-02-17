@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { gql, useMutation } from "@apollo/client";
 import { formatWeekHeader, getHolidaysInWeek, isCurrentWeek } from "@/lib/schedule-utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -204,6 +204,24 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     return weekStarts.find((ws) => isCurrentWeek(ws)) ?? null;
   }, [weekStarts]);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to current week column on mount
+  useEffect(() => {
+    if (!currentWeekStart || !scrollContainerRef.current) return;
+    // Wait for layout to complete
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const th = container.querySelector<HTMLElement>("[data-current-week]");
+      if (!th) return;
+      const firstTh = container.querySelector<HTMLElement>("thead th");
+      const stickyColWidth = firstTh ? firstTh.getBoundingClientRect().width : 180;
+      const thLeft = th.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft;
+      container.scrollLeft = thLeft - stickyColWidth;
+    });
+  }, [currentWeekStart]);
+
   const handleChipClick = (id: number | "eraser") => {
     if (activeProjectId === id) {
       handleSave();
@@ -246,7 +264,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
         )}
       </div>
 
-      <div className="overflow-auto border rounded-lg relative isolate">
+      <div ref={scrollContainerRef} className="overflow-auto border rounded-lg relative isolate">
         <table className="w-full border-collapse text-sm">
           <thead>
             <TooltipProvider>
@@ -258,7 +276,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                   const holidays = getHolidaysInWeek(ws);
                   const isCurrent = ws === currentWeekStart;
                   return (
-                    <th key={ws} className={`sticky top-0 z-10 px-2 py-2 text-center font-medium min-w-[130px] border-b border-r ${isCurrent ? "bg-blue-100 dark:bg-blue-950/40 border-x-2 border-x-blue-400 dark:border-x-blue-500" : "bg-muted"}`}>
+                    <th key={ws} {...(isCurrent ? { "data-current-week": true } : {})} className={`sticky top-0 z-10 px-2 py-2 text-center font-medium min-w-[130px] border-b border-r ${isCurrent ? "bg-blue-100 dark:bg-blue-950/40 border-x-2 border-x-blue-400 dark:border-x-blue-500" : "bg-muted"}`}>
                       {formatWeekHeader(ws)}
                       {holidays.length > 0 && (
                         <Tooltip>
