@@ -336,6 +336,7 @@ export const typeDefs = gql`
     leaveAssignments(startDate: String!, endDate: String!): [LeaveAssignment!]!
     onCallAssignments(startDate: String!, endDate: String!): [OnCallAssignment!]!
     scheduledProjects(weekStart: String!): [ScheduledProject!]!
+    projectAtlassianStatuses(projectIds: [Int!]!): [ProjectAtlassianStatus!]!
   }
 
   type ScheduledProject {
@@ -344,6 +345,10 @@ export const typeDefs = gql`
     color: String!
     status: ProjectStatus!
     assignees: [String!]!
+  }
+
+  type ProjectAtlassianStatus {
+    projectId: Int!
     lastUpdateDate: String
     atlassianStatus: String
   }
@@ -1013,7 +1018,6 @@ export const resolvers = {
           projectName: projects.name,
           color: projects.color,
           status: projects.status,
-          atlassianProjectKey: projects.atlassianProjectKey,
           userName: users.fullName,
         })
         .from(scheduleAssignments)
@@ -1028,43 +1032,48 @@ export const resolvers = {
         )
         .orderBy(asc(projects.name), asc(users.fullName));
 
-      const byProject = new Map<number, { projectName: string; color: string; status: string; atlassianProjectKey: string | null; assignees: string[] }>();
+      const byProject = new Map<number, { projectName: string; color: string; status: string; assignees: string[] }>();
       for (const row of rows) {
         if (!byProject.has(row.projectId)) {
-          byProject.set(row.projectId, { projectName: row.projectName, color: row.color, status: row.status, atlassianProjectKey: row.atlassianProjectKey, assignees: [] });
+          byProject.set(row.projectId, { projectName: row.projectName, color: row.color, status: row.status, assignees: [] });
         }
         byProject.get(row.projectId)!.assignees.push(row.userName);
       }
 
-      // Fetch Atlassian update dates for projects that have a key
-      const projectsWithAtlassian = [...byProject.entries()].filter(([, d]) => d.atlassianProjectKey);
-      let atlassianData = new Map<number, { lastUpdateDate: string | null; status: string | null }>();
-      if (projectsWithAtlassian.length > 0) {
-        const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
-        if (config) {
-          const results = await Promise.allSettled(
-            projectsWithAtlassian.map(async ([id, d]) => {
-              const data = await fetchAtlassianProject(config.domain, config.email, config.apiToken, d.atlassianProjectKey!);
-              return [id, { lastUpdateDate: data.latestUpdate?.date ?? null, status: data.status ?? null }] as const;
-            }),
-          );
-          for (const result of results) {
-            if (result.status === "fulfilled") {
-              atlassianData.set(result.value[0], result.value[1]);
-            }
-          }
-        }
-      }
-
       return [...byProject.entries()].map(([projectId, data]) => ({
         projectId,
-        projectName: data.projectName,
-        color: data.color,
-        status: data.status,
-        assignees: data.assignees,
-        lastUpdateDate: atlassianData.get(projectId)?.lastUpdateDate ?? null,
-        atlassianStatus: atlassianData.get(projectId)?.status ?? null,
+        ...data,
       }));
+    },
+    projectAtlassianStatuses: async (_: unknown, { projectIds }: { projectIds: number[] }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      if (projectIds.length === 0) return [];
+
+      const projectRows = await db
+        .select({ id: projects.id, atlassianProjectKey: projects.atlassianProjectKey })
+        .from(projects)
+        .where(and(eq(projects.ownerId, ownerId), inArray(projects.id, projectIds)));
+
+      const withKey = projectRows.filter((p) => p.atlassianProjectKey);
+      if (withKey.length === 0) return [];
+
+      const [config] = await db.select().from(jiraConfig).where(eq(jiraConfig.ownerId, ownerId));
+      if (!config) return [];
+
+      const results = await Promise.allSettled(
+        withKey.map(async (p) => {
+          const data = await fetchAtlassianProject(config.domain, config.email, config.apiToken, p.atlassianProjectKey!);
+          return {
+            projectId: p.id,
+            lastUpdateDate: data.latestUpdate?.date ?? null,
+            atlassianStatus: data.status ?? null,
+          };
+        }),
+      );
+
+      return results
+        .filter((r): r is PromiseFulfilledResult<{ projectId: number; lastUpdateDate: string | null; atlassianStatus: string | null }> => r.status === "fulfilled")
+        .map((r) => r.value);
     },
   },
   Mutation: {

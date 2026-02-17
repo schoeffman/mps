@@ -23,6 +23,14 @@ const GET_DASHBOARD_DATA = gql`
       color
       status
       assignees
+    }
+  }
+`;
+
+const GET_ATLASSIAN_STATUSES = gql`
+  query GetAtlassianStatuses($projectIds: [Int!]!) {
+    projectAtlassianStatuses(projectIds: $projectIds) {
+      projectId
       lastUpdateDate
       atlassianStatus
     }
@@ -50,6 +58,14 @@ function daysAgo(dateStr: string): number {
   return Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+interface ScheduledProject {
+  projectId: number;
+  projectName: string;
+  color: string;
+  status: string;
+  assignees: string[];
+}
+
 export default function Dashboard() {
   const today = new Date();
   const monday = getMonday(today);
@@ -69,6 +85,19 @@ export default function Dashboard() {
       weekStart: currentWeekStr,
     },
   });
+
+  const scheduledProjects: ScheduledProject[] = data?.scheduledProjects ?? [];
+  const projectIds = scheduledProjects.map((p) => p.projectId);
+
+  const { data: atlassianData } = useQuery(GET_ATLASSIAN_STATUSES, {
+    variables: { projectIds },
+    skip: projectIds.length === 0,
+  });
+
+  const atlassianMap = new Map<number, { lastUpdateDate: string | null; atlassianStatus: string | null }>();
+  for (const s of atlassianData?.projectAtlassianStatuses ?? []) {
+    atlassianMap.set(s.projectId, { lastUpdateDate: s.lastUpdateDate, atlassianStatus: s.atlassianStatus });
+  }
 
   // Leave data
   const leaveAssignments = data?.leaveAssignments ?? [];
@@ -94,9 +123,6 @@ export default function Dashboard() {
   const onCallNextWeek = onCallAssignments.filter(
     (a: { weekStart: string }) => a.weekStart === nextWeekStr,
   );
-
-  // Scheduled projects
-  const scheduledProjects = data?.scheduledProjects ?? [];
 
   return (
     <>
@@ -209,8 +235,9 @@ export default function Dashboard() {
                 <p className="text-muted-foreground text-sm">No projects scheduled this week.</p>
               ) : (
                 <ul className="-mx-6">
-                  {scheduledProjects.map((p: { projectId: number; projectName: string; color: string; status: string; assignees: string[]; lastUpdateDate: string | null; atlassianStatus: string | null }, i: number) => {
-                    const updateAge = p.lastUpdateDate ? daysAgo(p.lastUpdateDate) : null;
+                  {scheduledProjects.map((p, i) => {
+                    const atlassian = atlassianMap.get(p.projectId);
+                    const updateAge = atlassian?.lastUpdateDate ? daysAgo(atlassian.lastUpdateDate) : null;
                     return (
                       <li key={p.projectId} className={`px-6 py-2 flex items-start justify-between gap-4 text-sm ${i % 2 === 1 ? "bg-muted/50" : ""}`}>
                         <div className="min-w-0">
@@ -231,8 +258,8 @@ export default function Dashboard() {
                             <span className={`text-xs whitespace-nowrap ${p.status === "Complete" ? "text-muted-foreground" : updateAge > 7 ? "text-red-500 font-medium" : updateAge > 6 ? "text-yellow-500 font-medium" : "text-muted-foreground"}`}>
                               Updated {updateAge === 0 ? "today" : updateAge === 1 ? "1 day ago" : `${updateAge} days ago`}
                             </span>
-                            {p.atlassianStatus && (
-                              <p className="text-xs text-muted-foreground">{p.atlassianStatus}</p>
+                            {atlassian?.atlassianStatus && (
+                              <p className="text-xs text-muted-foreground">{atlassian.atlassianStatus}</p>
                             )}
                           </div>
                         )}
