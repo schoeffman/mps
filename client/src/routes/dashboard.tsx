@@ -33,6 +33,7 @@ const GET_ATLASSIAN_STATUSES = gql`
       projectId
       lastUpdateDate
       atlassianStatus
+      dueDate
     }
   }
 `;
@@ -94,9 +95,9 @@ export default function Dashboard() {
     skip: projectIds.length === 0,
   });
 
-  const atlassianMap = new Map<number, { lastUpdateDate: string | null; atlassianStatus: string | null }>();
+  const atlassianMap = new Map<number, { lastUpdateDate: string | null; atlassianStatus: string | null; dueDate: string | null }>();
   for (const s of atlassianData?.projectAtlassianStatuses ?? []) {
-    atlassianMap.set(s.projectId, { lastUpdateDate: s.lastUpdateDate, atlassianStatus: s.atlassianStatus });
+    atlassianMap.set(s.projectId, { lastUpdateDate: s.lastUpdateDate, atlassianStatus: s.atlassianStatus, dueDate: s.dueDate });
   }
 
   // Leave data
@@ -280,6 +281,9 @@ export default function Dashboard() {
                             </span>
                             {atlassian?.atlassianStatus && (
                               <p className="text-xs text-muted-foreground">{atlassian.atlassianStatus}</p>
+                            )}
+                            {atlassian?.dueDate && (
+                              <p className="text-xs text-muted-foreground">Due {new Date(atlassian.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
                             )}
                           </div>
                         )}

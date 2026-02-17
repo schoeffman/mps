@@ -351,6 +351,7 @@ export const typeDefs = gql`
     projectId: Int!
     lastUpdateDate: String
     atlassianStatus: String
+    dueDate: String
   }
 
   type LeaveAssignment {
@@ -1067,6 +1068,7 @@ export const resolvers = {
             projectId: p.id,
             lastUpdateDate: data.latestUpdate?.date ?? null,
             atlassianStatus: data.status ?? null,
+            dueDate: data.dueDate ?? null,
           };
         }),
       );
