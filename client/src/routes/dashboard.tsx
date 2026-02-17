@@ -2,7 +2,7 @@ import { useQuery, gql } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatWeekHeader } from "@/lib/schedule-utils";
+import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
 
 const GET_DASHBOARD_DATA = gql`
   query GetDashboardData($startDate: String!, $endDate: String!, $weekStart: String!) {
@@ -101,14 +101,34 @@ export default function Dashboard() {
 
   // Leave data
   const leaveAssignments = data?.leaveAssignments ?? [];
-  const leaveThisWeek = leaveAssignments.filter(
-    (a: { weekStart: string }) => a.weekStart === currentWeekStr,
-  );
+  const holidaysThisWeek = getHolidaysInWeek(currentWeekStr).map((name) => ({
+    userId: -1,
+    userName: "US Teams",
+    projectName: name,
+    weekStart: currentWeekStr,
+  }));
+  const leaveThisWeek = [
+    ...holidaysThisWeek,
+    ...leaveAssignments.filter(
+      (a: { weekStart: string }) => a.weekStart === currentWeekStr,
+    ),
+  ];
   const leaveUpcoming = leaveAssignments.filter(
     (a: { weekStart: string }) => a.weekStart > currentWeekStr,
   );
+
+  // Build upcoming weeks and check each for holidays
+  const upcomingHolidays: { userId: number; userName: string; projectName: string; weekStart: string }[] = [];
+  const endDateStr = formatDate(endDate);
+  for (let d = new Date(nextMonday); formatDate(d) <= endDateStr; d.setDate(d.getDate() + 7)) {
+    const ws = formatDate(d);
+    for (const name of getHolidaysInWeek(ws)) {
+      upcomingHolidays.push({ userId: -1, userName: "US Teams", projectName: name, weekStart: ws });
+    }
+  }
+
   const leaveByWeek = new Map<string, typeof leaveUpcoming>();
-  for (const a of leaveUpcoming) {
+  for (const a of [...upcomingHolidays, ...leaveUpcoming]) {
     const list = leaveByWeek.get(a.weekStart) ?? [];
     list.push(a);
     leaveByWeek.set(a.weekStart, list);
@@ -180,7 +200,7 @@ export default function Dashboard() {
                 ) : (
                   <ul className="-mx-6">
                     {leaveThisWeek.map((a: { userId: number; userName: string; projectName: string }, i: number) => (
-                      <li key={a.userId} className={`px-6 py-1.5 flex items-center justify-between text-sm ${i % 2 === 1 ? "bg-muted/50" : ""}`}>
+                      <li key={`${a.userId}-${a.projectName}`} className={`px-6 py-1.5 flex items-center justify-between text-sm ${i % 2 === 1 ? "bg-muted/50" : ""}`}>
                         <span className="font-medium">{a.userName}</span>
                         <span className="text-muted-foreground">{a.projectName}</span>
                       </li>
