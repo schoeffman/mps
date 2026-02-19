@@ -58,9 +58,19 @@ On the client, `SpaceProvider` (wraps all authenticated routes) queries availabl
 - Server: session extracted in Apollo context function, `requireAuth()` guard on mutations
 - Client: `ProtectedRoute` redirects to `/login` if no session
 
-### Jira Integration
+### Dashboard
 
-Optional per-owner Jira Cloud integration. Credentials stored in `jira_config` table (domain, email, API token). Projects can have a nullable `jira_project_key` column. The server proxies all Jira API calls (`server/src/lib/jira-client.ts`) so credentials never reach the client. Settings page has a "Jira Integration" section (owner-only) for managing config. Edit project dialog shows a "Jira Project Key" field when config exists. Project detail page shows a "Jira Issues" table when a project has a linked key.
+The landing page (`/`) shows an at-a-glance overview:
+
+- **On Call This Week / Next Week** — users assigned to the "On Call" system project
+- **On Leave This Week / Upcoming Leave** — users assigned to "Leave (Standard)" or "Leave (Extended)" system projects, plus US holidays (shown as "US Teams")
+- **Projects Scheduled This Week** — non-system projects with assignments for the current week, linked to project detail pages. For projects with an Atlassian integration, shows update age (color-coded: normal < 7 days, yellow 6-7 days, red > 7 days unless Complete), Atlassian status, and due date.
+
+Atlassian data is fetched in a separate GraphQL query (`projectAtlassianStatuses`) so it doesn't block the main dashboard load.
+
+### Jira / Atlassian Integration
+
+Optional per-owner Jira Cloud and Atlassian Projects integration. Credentials stored in `jira_config` table (domain, email, API token). Projects can have nullable `jira_project_key` and `atlassian_project_key` columns. The server proxies all API calls (`server/src/lib/jira-client.ts`, `server/src/lib/atlassian-projects-client.ts`) so credentials never reach the client. Settings page has a "Jira Integration" section (owner-only) for managing config. Edit project dialog shows key fields when config exists. Project detail page shows Jira Issues and Atlassian Project data when linked.
 
 ### GraphQL
 
@@ -71,6 +81,7 @@ Single schema in `server/src/schema.ts` — types, resolvers, and helpers all in
 Vitest runs from the project root across both workspaces (`npm test`). Tests target pure utility functions — no DB or network required.
 
 - `client/src/lib/schedule-utils.test.ts` — quarter ranges, week generation, holiday detection, formatting
+- `client/src/lib/gantt-scheduler.test.ts` — Gantt chart issue scheduling algorithm
 - `server/src/lib/merge-week-ranges.test.ts` — merging consecutive weekly assignments into date ranges
 - `server/src/lib/generate-date-range.test.ts` — inclusive date range generation
 

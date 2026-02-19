@@ -59,13 +59,11 @@ interface ScheduleGridProps {
   projects: Project[];
   assignments: Assignment[];
   weekStarts: string[];
-  startDate: string;
-  endDate: string;
   unassignedUsers: UnassignedUser[];
 }
 
 
-export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, startDate, endDate, unassignedUsers }: ScheduleGridProps) {
+export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekStarts, unassignedUsers }: ScheduleGridProps) {
   const [setAssignment] = useMutation(SET_SCHEDULE_ASSIGNMENT, {
     refetchQueries: ["GetScheduleDetail"],
   });
@@ -74,6 +72,16 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
   });
 
   const assignableProjects = useMemo(() => projects.filter((p) => p.status !== "Complete" && p.status !== "Cancelled"), [projects]);
+
+  // Sort team members so the team lead is always first
+  const sortedTeams = useMemo(() => teams.map((team) => ({
+    ...team,
+    members: [...team.members].sort((a, b) => {
+      if (a.id === team.teamLead.id) return -1;
+      if (b.id === team.teamLead.id) return 1;
+      return 0;
+    }),
+  })), [teams]);
 
   // Paint mode state
   const [activeProjectId, setActiveProjectId] = useState<number | null | "eraser">(null);
@@ -314,7 +322,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
             </TooltipProvider>
           </thead>
           <tbody>
-            {teams.map((team) => (
+            {sortedTeams.map((team) => (
               <>
                 <tr key={`team-${team.id}`}>
                   <td

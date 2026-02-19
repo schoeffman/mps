@@ -106,6 +106,7 @@ npm run test:watch  # watch mode
 Tests focus on pure utility functions extracted from resolvers:
 
 - `client/src/lib/schedule-utils.test.ts` — quarter ranges, week generation, holiday detection, formatting
+- `client/src/lib/gantt-scheduler.test.ts` — Gantt chart issue scheduling algorithm
 - `server/src/lib/merge-week-ranges.test.ts` — merging consecutive weekly assignments into date ranges
 - `server/src/lib/generate-date-range.test.ts` — inclusive date range generation
 
@@ -113,12 +114,14 @@ No database or network connection is required to run tests.
 
 ## Features
 
+- **Dashboard** — landing page showing on-call assignments (this week and next), leave/vacation overview (with US holidays), and projects scheduled this week with Atlassian project status
 - **Users** — manage people with craft ability, job level, and focus area
 - **Teams** — group users with a team lead
 - **Projects** — track projects with DRI, status, target date, and color coding
-- **Schedules** — quarterly schedule grids showing weekly user/project assignments
+- **Schedules** — quarterly schedule grids showing weekly user/project assignments with column and row bulk assignment, paint mode, and auto-scroll to the current week
 - **Work History** — daily snapshots of schedule assignments with a date picker for browsing past records (cron job runs at 11 PM daily)
 - **Jira Integration** — link projects to Jira Cloud to view issues (key, summary, status, assignee) directly on the project detail page
+- **Atlassian Projects Integration** — link projects to Atlassian Projects to view status, latest update, and due date on the dashboard and project detail page
 - **Auth** — Google (and Apple) social login via Better Auth with per-user data isolation
 
 ## Jira Integration

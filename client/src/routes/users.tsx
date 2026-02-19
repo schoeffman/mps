@@ -21,7 +21,7 @@ export default function Users() {
   return (
     <>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Users</h1>
+        <h1 className="text-2xl font-semibold">Users{data && <span className="text-base font-normal text-muted-foreground ml-2">({data.users.length})</span>}</h1>
         <AddUserDialog />
       </div>
       {loading && <p>Loading...</p>}

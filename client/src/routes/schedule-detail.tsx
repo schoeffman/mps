@@ -299,8 +299,6 @@ export default function ScheduleDetail() {
             projects={detailData.projects}
             assignments={detailData.scheduleAssignments}
             weekStarts={weekStarts}
-            startDate={startDate}
-            endDate={endDate}
             unassignedUsers={unassignedUsers}
           />
           {totalSlots > 0 && (
