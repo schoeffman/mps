@@ -345,6 +345,7 @@ export const typeDefs = gql`
     color: String!
     status: ProjectStatus!
     assignees: [String!]!
+    targetDate: String
   }
 
   type ProjectAtlassianStatus {
@@ -1019,6 +1020,7 @@ export const resolvers = {
           projectName: projects.name,
           color: projects.color,
           status: projects.status,
+          targetDate: projects.targetDate,
           userName: users.fullName,
         })
         .from(scheduleAssignments)
@@ -1033,10 +1035,10 @@ export const resolvers = {
         )
         .orderBy(asc(projects.name), asc(users.fullName));
 
-      const byProject = new Map<number, { projectName: string; color: string; status: string; assignees: string[] }>();
+      const byProject = new Map<number, { projectName: string; color: string; status: string; targetDate: string | null; assignees: string[] }>();
       for (const row of rows) {
         if (!byProject.has(row.projectId)) {
-          byProject.set(row.projectId, { projectName: row.projectName, color: row.color, status: row.status, assignees: [] });
+          byProject.set(row.projectId, { projectName: row.projectName, color: row.color, status: row.status, targetDate: row.targetDate, assignees: [] });
         }
         byProject.get(row.projectId)!.assignees.push(row.userName);
       }

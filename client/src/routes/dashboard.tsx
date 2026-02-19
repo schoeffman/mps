@@ -2,6 +2,7 @@ import { useQuery, gql } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TriangleAlert } from "lucide-react";
 import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
 
 const GET_DASHBOARD_DATA = gql`
@@ -23,6 +24,7 @@ const GET_DASHBOARD_DATA = gql`
       color
       status
       assignees
+      targetDate
     }
   }
 `;
@@ -65,6 +67,7 @@ interface ScheduledProject {
   color: string;
   status: string;
   assignees: string[];
+  targetDate: string | null;
 }
 
 export default function Dashboard() {
@@ -282,9 +285,15 @@ export default function Dashboard() {
                             {atlassian?.atlassianStatus && (
                               <p className="text-xs text-muted-foreground">{atlassian.atlassianStatus}</p>
                             )}
-                            {atlassian?.dueDate && (
-                              <p className="text-xs text-muted-foreground">Due {new Date(atlassian.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-                            )}
+                            {atlassian?.dueDate && (() => {
+                              const hasMismatch = p.targetDate && new Date(atlassian.dueDate).toLocaleDateString() !== new Date(p.targetDate).toLocaleDateString();
+                              return (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+                                  Due {new Date(atlassian.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {hasMismatch && <><TriangleAlert className="size-3 text-yellow-600" /><span className="text-yellow-600">Mismatch with internal date ({new Date(p.targetDate!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})</span></>}
+                                </p>
+                              );
+                            })()}
                           </div>
                         )}
                       </li>

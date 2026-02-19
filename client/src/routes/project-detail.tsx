@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useLazyQuery, useMutation, gql } from "@apollo/client";
 import { GET_PROJECTS } from "@/routes/projects";
-import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2, BarChart3 } from "lucide-react";
+import { ArrowLeft, Trash2, X, ExternalLink, ArrowUp, ArrowDown, RefreshCw, Loader2, BarChart3, TriangleAlert } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { GanttChart, type GanttTask } from "@/components/gantt-chart";
 import { scheduleIssues, type JiraIssue, type Assignment } from "@/lib/gantt-scheduler";
 import { Button } from "@/components/ui/button";
@@ -430,6 +431,23 @@ export default function ProjectDetail() {
           </div>
         )}
       </div>
+
+      {atlassianData?.atlassianProject?.dueDate && (() => {
+        const atlassianDue = new Date(atlassianData.atlassianProject.dueDate).toLocaleDateString();
+        const internalTarget = new Date(project.targetDate).toLocaleDateString();
+        if (atlassianDue !== internalTarget) {
+          return (
+            <Alert className="mb-4 bg-amber-50 dark:bg-amber-950">
+              <TriangleAlert className="text-yellow-600" />
+              <AlertTitle>Target date mismatch</AlertTitle>
+              <AlertDescription>
+                Internal target date ({internalTarget}) does not match Atlassian due date ({atlassianDue})
+              </AlertDescription>
+            </Alert>
+          );
+        }
+        return null;
+      })()}
 
       <div className="mb-6 text-sm text-muted-foreground space-y-1">
         <p>DRI: {project.dri.fullName}</p>
