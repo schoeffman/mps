@@ -1,19 +1,13 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Pencil } from "lucide-react";
 import { getProjectColor } from "@/lib/project-colors";
-import { EditProjectDialog } from "./edit-project-dialog";
 
 interface Project {
   id: number;
   name: string;
-  targetDate: string;
-  dri: { id: number; fullName: string };
-  status: string;
   color: string;
   projectType: string;
   isSystem: boolean;
-  members: { id: number; fullName: string }[];
 }
 
 interface Assignment {
@@ -196,30 +190,17 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">By Project</span>
           {slices.map((s, i) => {
             const project = s.projectId != null ? projectMap.get(s.projectId) : null;
-
             return (
               <div key={i} className="flex items-center gap-2 text-sm">
                 <span
                   className="inline-block w-3 h-3 rounded-sm shrink-0"
                   style={{ backgroundColor: s.color }}
                 />
-                <span className="inline-flex items-center gap-1">
-                  {project && !project.isSystem && (
-                    <EditProjectDialog
-                      project={project}
-                      trigger={
-                        <button className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                          <Pencil className="size-3" />
-                        </button>
-                      }
-                    />
-                  )}
-                  {project ? (
-                    <Link to={`/projects/${project.id}`} className="hover:underline">{s.label}</Link>
-                  ) : (
-                    s.label
-                  )}
-                </span>
+                {project && !project.isSystem ? (
+                  <Link to={`/projects/${project.id}`} className="hover:underline">{s.label}</Link>
+                ) : (
+                  <span>{s.label}</span>
+                )}
                 <span className="text-sm">
                   {" "}({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
                 </span>
