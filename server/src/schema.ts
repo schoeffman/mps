@@ -403,6 +403,7 @@ export const typeDefs = gql`
     assignJiraIssue(issueKey: String!, accountId: String): Boolean!
     toggleProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
     skipProjectChecklistItem(projectId: Int!, itemKey: String!): Boolean!
+    updateProjectTargetDate(id: Int!, targetDate: String!): Project!
     updateProjectColor(id: Int!, color: String!): Project!
     deleteMyAccount: Boolean!
   }
@@ -1576,6 +1577,16 @@ export const resolvers = {
         await db.insert(projectChecklistCompletions).values({ projectId, itemKey, status: "skipped", completedBy: user.email, completedAt: today });
       }
       return true;
+    },
+    updateProjectTargetDate: async (_: unknown, { id, targetDate }: { id: number; targetDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [projectRow] = await db
+        .update(projects)
+        .set({ targetDate })
+        .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
+        .returning();
+      if (!projectRow) throw new Error("Project not found");
+      return mapProjectFromDb(projectRow);
     },
     updateProjectColor: async (_: unknown, { id, color }: { id: number; color: string }, context: Context) => {
       const ownerId = getOwnerId(context);

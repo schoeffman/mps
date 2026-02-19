@@ -63,6 +63,15 @@ const GET_PROJECT = gql`
   }
 `;
 
+const UPDATE_PROJECT_TARGET_DATE = gql`
+  mutation UpdateProjectTargetDate($id: Int!, $targetDate: String!) {
+    updateProjectTargetDate(id: $id, targetDate: $targetDate) {
+      id
+      targetDate
+    }
+  }
+`;
+
 const DELETE_PROJECT = gql`
   mutation DeleteProject($id: Int!) {
     deleteProject(id: $id)
@@ -238,6 +247,10 @@ export default function ProjectDetail() {
   const [removeProjectLink] = useMutation(REMOVE_PROJECT_LINK, {
     refetchQueries: [{ query: GET_PROJECT, variables: { id: projectId } }],
   });
+  const [updateTargetDate] = useMutation(UPDATE_PROJECT_TARGET_DATE, {
+    refetchQueries: [{ query: GET_PROJECT, variables: { id: projectId } }],
+  });
+  const [showDateMismatch, setShowDateMismatch] = useState(false);
 
   const { data: assignmentsData } = useQuery(GET_PROJECT_ASSIGNMENTS, {
     variables: { projectId },
@@ -433,17 +446,42 @@ export default function ProjectDetail() {
       </div>
 
       {atlassianData?.atlassianProject?.dueDate && (() => {
-        const atlassianDue = new Date(atlassianData.atlassianProject.dueDate).toLocaleDateString();
-        const internalTarget = new Date(project.targetDate).toLocaleDateString();
+        const atlassianDue = new Date(atlassianData.atlassianProject.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const internalTarget = new Date(project.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         if (atlassianDue !== internalTarget) {
           return (
-            <Alert className="mb-4 bg-amber-50 dark:bg-amber-950">
-              <TriangleAlert className="text-yellow-600" />
-              <AlertTitle>Target date mismatch</AlertTitle>
-              <AlertDescription>
-                Internal target date ({internalTarget}) does not match Atlassian due date ({atlassianDue})
-              </AlertDescription>
-            </Alert>
+            <>
+              <Alert className="mb-4 bg-amber-50 dark:bg-amber-950">
+                <TriangleAlert className="text-yellow-600" />
+                <AlertTitle>Target date mismatch</AlertTitle>
+                <AlertDescription>
+                  <button onClick={() => setShowDateMismatch(true)} className="text-yellow-600 hover:underline cursor-pointer">
+                    Internal target date ({internalTarget}) does not match Atlassian due date ({atlassianDue})
+                  </button>
+                </AlertDescription>
+              </Alert>
+              <AlertDialog open={showDateMismatch} onOpenChange={setShowDateMismatch}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Update target date?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The Atlassian due date for <span className="font-medium">{project.name}</span> is{" "}
+                      <span className="font-medium">{atlassianDue}</span>.
+                      Would you like to update the internal target date to match?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>No</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {
+                      const targetDate = atlassianData.atlassianProject.dueDate.split("T")[0];
+                      updateTargetDate({ variables: { id: projectId, targetDate } });
+                    }}>
+                      Yes, update target date
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           );
         }
         return null;

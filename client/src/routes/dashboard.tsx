@@ -1,8 +1,20 @@
-import { useQuery, gql } from "@apollo/client";
+import { useState } from "react";
+import { useQuery, useMutation, gql } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatWeekHeader, getHolidaysInWeek } from "@/lib/schedule-utils";
 
 const GET_DASHBOARD_DATA = gql`
@@ -36,6 +48,15 @@ const GET_ATLASSIAN_STATUSES = gql`
       lastUpdateDate
       atlassianStatus
       dueDate
+    }
+  }
+`;
+
+const UPDATE_PROJECT_TARGET_DATE = gql`
+  mutation UpdateProjectTargetDate($id: Int!, $targetDate: String!) {
+    updateProjectTargetDate(id: $id, targetDate: $targetDate) {
+      id
+      targetDate
     }
   }
 `;
@@ -102,6 +123,11 @@ export default function Dashboard() {
   for (const s of atlassianData?.projectAtlassianStatuses ?? []) {
     atlassianMap.set(s.projectId, { lastUpdateDate: s.lastUpdateDate, atlassianStatus: s.atlassianStatus, dueDate: s.dueDate });
   }
+
+  const [dateMismatchProject, setDateMismatchProject] = useState<{ projectId: number; projectName: string; atlassianDueDate: string } | null>(null);
+  const [updateTargetDate] = useMutation(UPDATE_PROJECT_TARGET_DATE, {
+    refetchQueries: ["GetDashboardData"],
+  });
 
   // Leave data
   const leaveAssignments = data?.leaveAssignments ?? [];
@@ -290,7 +316,15 @@ export default function Dashboard() {
                               return (
                                 <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
                                   Due {new Date(atlassian.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                  {hasMismatch && <><TriangleAlert className="size-3 text-yellow-600" /><span className="text-yellow-600">Mismatch with internal date ({new Date(p.targetDate!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})</span></>}
+                                  {hasMismatch && (
+                                    <button
+                                      onClick={() => setDateMismatchProject({ projectId: p.projectId, projectName: p.projectName, atlassianDueDate: atlassian.dueDate! })}
+                                      className="inline-flex items-center gap-1 text-yellow-600 hover:underline cursor-pointer"
+                                    >
+                                      <TriangleAlert className="size-3" />
+                                      <span>Mismatch with internal date ({new Date(p.targetDate!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})</span>
+                                    </button>
+                                  )}
                                 </p>
                               );
                             })()}
@@ -305,6 +339,34 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
+
+      <AlertDialog open={!!dateMismatchProject} onOpenChange={(open) => { if (!open) setDateMismatchProject(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update target date?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {dateMismatchProject && (
+                <>
+                  The Atlassian due date for <span className="font-medium">{dateMismatchProject.projectName}</span> is{" "}
+                  <span className="font-medium">{new Date(dateMismatchProject.atlassianDueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>.
+                  Would you like to update the internal target date to match?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (!dateMismatchProject) return;
+              const { projectId, atlassianDueDate } = dateMismatchProject;
+              const targetDate = atlassianDueDate.split("T")[0];
+              updateTargetDate({ variables: { id: projectId, targetDate } });
+            }}>
+              Yes, update target date
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
