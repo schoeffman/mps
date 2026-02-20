@@ -78,9 +78,9 @@ export function AppSidebar() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild isActive={location.pathname === "/users/performance"}>
-                          <NavLink to="/users/performance">
-                            Performance
+                        <SidebarMenuSubButton asChild isActive={location.pathname === "/users/tenure"}>
+                          <NavLink to="/users/tenure">
+                            Tenure
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

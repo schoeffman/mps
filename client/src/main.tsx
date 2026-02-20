@@ -7,7 +7,7 @@ import { ProtectedRoute } from "./components/protected-route";
 import Login from "./routes/login";
 import Root from "./routes/root";
 import Users from "./routes/users";
-import Performance from "./routes/performance";
+import Tenure from "./routes/tenure";
 import Teams from "./routes/teams";
 import TeamDetail from "./routes/team-detail";
 import UserDetail from "./routes/user-detail";
@@ -32,7 +32,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
           { path: "users", element: <Users /> },
-          { path: "users/performance", element: <Performance /> },
+          { path: "users/tenure", element: <Tenure /> },
           { path: "users/:id", element: <UserDetail /> },
           { path: "teams", element: <Teams /> },
           { path: "teams/:id", element: <TeamDetail /> },

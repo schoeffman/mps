@@ -27,7 +27,7 @@ function monthsRemaining(dateStr: string, limitMonths: number): number {
   return limitMonths - elapsed;
 }
 
-export default function Performance() {
+export default function Tenure() {
   const { data: usersData, loading: usersLoading } = useQuery(GET_USERS);
   const { data: limitsData, loading: limitsLoading } = useQuery(JOB_LEVEL_LIMITS);
 
@@ -59,7 +59,7 @@ export default function Performance() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold mb-6">Performance</h1>
+      <h1 className="text-2xl font-semibold mb-6">Tenure</h1>
 
       {limitMap.size === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -118,7 +118,7 @@ export default function Performance() {
                             </TableCell>
                           </TableRow>
                           <TableRow className="hover:bg-transparent">
-                            <TableCell colSpan={3} className="pt-0 pb-3">
+                            <TableCell colSpan={3} className="pt-2 pb-6">
                               <div className="relative h-2 w-full">
                                 <div className="absolute inset-0 rounded-full bg-muted" />
                                 {pct !== null && (
