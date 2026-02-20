@@ -112,6 +112,40 @@ function formatCycleMonth(cycleMonth: string) {
 }
 
 
+function RatingBar({ users }: { users: CycleUser[] }) {
+  if (users.length === 0) return null;
+  const total = users.length;
+  const segments = RATINGS
+    .map((r) => ({ ...r, count: users.filter((u) => u.rating === r.value).length }))
+    .filter((r) => r.count > 0);
+
+  return (
+    <div className="mb-6">
+      <div className="flex h-5 rounded-full overflow-hidden">
+        {segments.map((seg) => (
+          <div
+            key={ratingToKey(seg.value)}
+            className={seg.dotClass}
+            style={{ width: `${(seg.count / total) * 100}%` }}
+            title={`${seg.label}: ${seg.count} (${Math.round((seg.count / total) * 100)}%)`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+        {segments.map((seg) => (
+          <div key={ratingToKey(seg.value)} className="flex items-center gap-1.5 text-sm">
+            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${seg.dotClass}`} />
+            <span className={seg.textClass}>{seg.label}</span>
+            <span className="text-muted-foreground">
+              {seg.count} ({Math.round((seg.count / total) * 100)}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RatingSelect({
   value,
   onChange,
@@ -318,6 +352,8 @@ export default function PerformanceCycleDetail() {
       <div className="mb-6 text-sm text-muted-foreground">
         <p>Month: {formatCycleMonth(cycle.cycleMonth)}</p>
       </div>
+
+      <RatingBar users={users} />
 
       <div className="flex items-center gap-2 mb-2">
         <h2 className="text-lg font-semibold">Users</h2>
