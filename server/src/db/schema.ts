@@ -59,6 +59,7 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   craftAbility: text("craft_ability").notNull(),
   jobLevel: text("job_level").notNull(),
+  levelStartDate: text("level_start_date"),
   craftFocus: text("craft_focus").notNull().default("Not Applicable"),
   authUserId: text("auth_user_id").references(() => authUser.id),
   ownerId: text("owner_id").notNull().references(() => authUser.id),

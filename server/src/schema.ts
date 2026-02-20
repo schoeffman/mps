@@ -72,6 +72,7 @@ export const typeDefs = gql`
     fullName: String!
     craftAbility: CraftAbility!
     jobLevel: JobLevel!
+    levelStartDate: String
     craftFocus: CraftFocus!
     createdAt: String!
   }
@@ -80,6 +81,7 @@ export const typeDefs = gql`
     fullName: String!
     craftAbility: CraftAbility!
     jobLevel: JobLevel!
+    levelStartDate: String
     craftFocus: CraftFocus!
   }
 
@@ -87,6 +89,7 @@ export const typeDefs = gql`
     fullName: String!
     craftAbility: CraftAbility!
     jobLevel: JobLevel!
+    levelStartDate: String
     craftFocus: CraftFocus!
   }
 
@@ -1101,7 +1104,7 @@ export const resolvers = {
   Mutation: {
     createUser: async (
       _: unknown,
-      { input }: { input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
+      { input }: { input: { fullName: string; craftAbility: string; jobLevel: string; levelStartDate?: string; craftFocus: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -1111,6 +1114,7 @@ export const resolvers = {
           fullName: input.fullName,
           craftAbility: craftAbilityToDb[input.craftAbility] ?? input.craftAbility,
           jobLevel: input.jobLevel,
+          levelStartDate: input.levelStartDate ?? null,
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
           ownerId,
         })
@@ -1119,7 +1123,7 @@ export const resolvers = {
     },
     updateUser: async (
       _: unknown,
-      { id, input }: { id: number; input: { fullName: string; craftAbility: string; jobLevel: string; craftFocus: string } },
+      { id, input }: { id: number; input: { fullName: string; craftAbility: string; jobLevel: string; levelStartDate?: string; craftFocus: string } },
       context: Context,
     ) => {
       const ownerId = getOwnerId(context);
@@ -1129,6 +1133,7 @@ export const resolvers = {
           fullName: input.fullName,
           craftAbility: craftAbilityToDb[input.craftAbility] ?? input.craftAbility,
           jobLevel: input.jobLevel,
+          levelStartDate: input.levelStartDate ?? null,
           craftFocus: craftFocusToDb[input.craftFocus] ?? input.craftFocus,
         })
         .where(and(eq(users.id, id), eq(users.ownerId, ownerId)))

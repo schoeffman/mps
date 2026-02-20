@@ -26,6 +26,7 @@ const CREATE_USER = gql`
       fullName
       craftAbility
       jobLevel
+      levelStartDate
       craftFocus
       createdAt
     }
@@ -37,6 +38,7 @@ export function AddUserDialog() {
   const [fullName, setFullName] = useState("");
   const [craftAbility, setCraftAbility] = useState("");
   const [jobLevel, setJobLevel] = useState("");
+  const [levelStartDate, setLevelStartDate] = useState("");
   const [craftFocus, setCraftFocus] = useState("NotApplicable");
 
   const [createUser, { loading }] = useMutation(CREATE_USER, {
@@ -47,6 +49,7 @@ export function AddUserDialog() {
     setFullName("");
     setCraftAbility("");
     setJobLevel("");
+    setLevelStartDate("");
     setCraftFocus("NotApplicable");
   }
 
@@ -54,7 +57,7 @@ export function AddUserDialog() {
     e.preventDefault();
     await createUser({
       variables: {
-        input: { fullName, craftAbility, jobLevel, craftFocus },
+        input: { fullName, craftAbility, jobLevel, levelStartDate: levelStartDate || null, craftFocus },
       },
     });
     resetForm();
@@ -110,6 +113,16 @@ export function AddUserDialog() {
                 <SelectItem value="Principal">Principal</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="levelStartDate">Time at Level Start Date</Label>
+            <Input
+              id="levelStartDate"
+              type="date"
+              value={levelStartDate}
+              onChange={(e) => setLevelStartDate(e.target.value)}
+            />
           </div>
 
           <div className="grid gap-2">

@@ -9,6 +9,7 @@ export const GET_USERS = gql`
       fullName
       craftAbility
       jobLevel
+      levelStartDate
       craftFocus
       createdAt
     }

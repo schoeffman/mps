@@ -27,6 +27,7 @@ const UPDATE_USER = gql`
       fullName
       craftAbility
       jobLevel
+      levelStartDate
       craftFocus
       createdAt
     }
@@ -39,6 +40,7 @@ interface EditUserDialogProps {
     fullName: string;
     craftAbility: string;
     jobLevel: string;
+    levelStartDate: string | null;
     craftFocus: string;
   };
 }
@@ -48,6 +50,7 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
   const [fullName, setFullName] = useState(user.fullName);
   const [craftAbility, setCraftAbility] = useState(user.craftAbility);
   const [jobLevel, setJobLevel] = useState(user.jobLevel);
+  const [levelStartDate, setLevelStartDate] = useState(user.levelStartDate ?? "");
   const [craftFocus, setCraftFocus] = useState(user.craftFocus);
 
   const [updateUser, { loading }] = useMutation(UPDATE_USER, {
@@ -58,6 +61,7 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
     setFullName(user.fullName);
     setCraftAbility(user.craftAbility);
     setJobLevel(user.jobLevel);
+    setLevelStartDate(user.levelStartDate ?? "");
     setCraftFocus(user.craftFocus);
   }
 
@@ -73,7 +77,7 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
     await updateUser({
       variables: {
         id: user.id,
-        input: { fullName, craftAbility, jobLevel, craftFocus },
+        input: { fullName, craftAbility, jobLevel, levelStartDate: levelStartDate || null, craftFocus },
       },
     });
     setOpen(false);
@@ -130,6 +134,16 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
                 <SelectItem value="Principal">Principal</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="edit-levelStartDate">Time at Level Start Date</Label>
+            <Input
+              id="edit-levelStartDate"
+              type="date"
+              value={levelStartDate}
+              onChange={(e) => setLevelStartDate(e.target.value)}
+            />
           </div>
 
           <div className="grid gap-2">

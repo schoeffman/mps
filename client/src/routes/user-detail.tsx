@@ -33,6 +33,7 @@ const GET_USER = gql`
       fullName
       craftAbility
       jobLevel
+      levelStartDate
       craftFocus
       createdAt
     }
@@ -172,6 +173,9 @@ export default function UserDetail() {
       <div className="text-sm text-muted-foreground space-y-1">
         <p>Craft Ability: {formatEnum(user.craftAbility)}</p>
         <p>Job Level: {user.jobLevel}</p>
+        {user.levelStartDate && (
+          <p>Time at Level Since: {new Date(user.levelStartDate).toLocaleDateString()}</p>
+        )}
         <p>Craft Focus: {formatEnum(user.craftFocus)}</p>
       </div>
 

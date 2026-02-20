@@ -15,6 +15,7 @@ interface User {
   fullName: string;
   craftAbility: string;
   jobLevel: string;
+  levelStartDate: string | null;
   craftFocus: string;
   createdAt: string;
 }
