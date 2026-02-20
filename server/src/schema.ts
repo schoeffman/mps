@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions, performanceCycles, performanceCycleMembers } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
 import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue, searchJiraUsers, assignJiraIssue } from "./lib/jira-client.js";
@@ -315,6 +315,26 @@ export const typeDefs = gql`
     dateRanges: [DateRange!]!
   }
 
+  type PerformanceCycle {
+    id: Int!
+    title: String!
+    cycleMonth: String!
+    users: [User!]!
+    createdAt: String!
+  }
+
+  input CreatePerformanceCycleInput {
+    title: String!
+    cycleMonth: String!
+    userIds: [Int!]!
+  }
+
+  input UpdatePerformanceCycleInput {
+    title: String!
+    cycleMonth: String!
+    userIds: [Int!]!
+  }
+
   type Query {
     hello: String
     users: [User!]!
@@ -346,6 +366,8 @@ export const typeDefs = gql`
     onCallAssignments(startDate: String!, endDate: String!): [OnCallAssignment!]!
     scheduledProjects(weekStart: String!): [ScheduledProject!]!
     projectAtlassianStatuses(projectIds: [Int!]!): [ProjectAtlassianStatus!]!
+    performanceCycles: [PerformanceCycle!]!
+    performanceCycle(id: Int!): PerformanceCycle
   }
 
   type ScheduledProject {
@@ -417,6 +439,10 @@ export const typeDefs = gql`
     updateProjectTargetDate(id: Int!, targetDate: String!): Project!
     updateProjectColor(id: Int!, color: String!): Project!
     deleteMyAccount: Boolean!
+    createPerformanceCycle(input: CreatePerformanceCycleInput!): PerformanceCycle!
+    updatePerformanceCycle(id: Int!, input: UpdatePerformanceCycleInput!): PerformanceCycle!
+    deletePerformanceCycle(id: Int!): Boolean!
+    reorderPerformanceCycleUsers(cycleId: Int!, userIds: [Int!]!): Boolean!
   }
 `;
 
@@ -593,6 +619,22 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
     members: memberRows.map((r) => mapUserFromDb(r.user)),
     links: linkRows.map((l) => ({ id: l.id, url: l.url, createdAt: l.createdAt.toISOString() })),
     createdAt: projectRow.createdAt.toISOString(),
+  };
+}
+
+async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSelect) {
+  const memberRows = await db
+    .select({ user: users })
+    .from(performanceCycleMembers)
+    .innerJoin(users, eq(performanceCycleMembers.userId, users.id))
+    .where(eq(performanceCycleMembers.cycleId, row.id))
+    .orderBy(asc(performanceCycleMembers.sortOrder));
+  return {
+    id: row.id,
+    title: row.title,
+    cycleMonth: row.cycleMonth,
+    users: memberRows.map((r) => mapUserFromDb(r.user)),
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -1099,6 +1141,17 @@ export const resolvers = {
       return results
         .filter((r): r is PromiseFulfilledResult<{ projectId: number; lastUpdateDate: string | null; atlassianStatus: string | null }> => r.status === "fulfilled")
         .map((r) => r.value);
+    },
+    performanceCycles: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db.select().from(performanceCycles).where(eq(performanceCycles.ownerId, ownerId)).orderBy(desc(performanceCycles.createdAt));
+      return Promise.all(rows.map(mapPerformanceCycleFromDb));
+    },
+    performanceCycle: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db.select().from(performanceCycles).where(and(eq(performanceCycles.id, id), eq(performanceCycles.ownerId, ownerId)));
+      if (!row) return null;
+      return mapPerformanceCycleFromDb(row);
     },
   },
   Mutation: {
@@ -1676,6 +1729,55 @@ export const resolvers = {
       await db.delete(account).where(eq(account.userId, ownerId));
       await db.delete(authUser).where(eq(authUser.id, ownerId));
 
+      return true;
+    },
+    createPerformanceCycle: async (
+      _: unknown,
+      { input }: { input: { title: string; cycleMonth: string; userIds: number[] } },
+      context: Context,
+    ) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .insert(performanceCycles)
+        .values({ title: input.title, cycleMonth: input.cycleMonth, ownerId })
+        .returning();
+      if (input.userIds.length > 0) {
+        await db.insert(performanceCycleMembers).values(input.userIds.map((userId, index) => ({ cycleId: row.id, userId, sortOrder: index })));
+      }
+      return mapPerformanceCycleFromDb(row);
+    },
+    updatePerformanceCycle: async (
+      _: unknown,
+      { id, input }: { id: number; input: { title: string; cycleMonth: string; userIds: number[] } },
+      context: Context,
+    ) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .update(performanceCycles)
+        .set({ title: input.title, cycleMonth: input.cycleMonth })
+        .where(and(eq(performanceCycles.id, id), eq(performanceCycles.ownerId, ownerId)))
+        .returning();
+      if (!row) throw new Error("Performance cycle not found");
+      await db.delete(performanceCycleMembers).where(eq(performanceCycleMembers.cycleId, id));
+      if (input.userIds.length > 0) {
+        await db.insert(performanceCycleMembers).values(input.userIds.map((userId, index) => ({ cycleId: id, userId, sortOrder: index })));
+      }
+      return mapPerformanceCycleFromDb(row);
+    },
+    deletePerformanceCycle: async (_: unknown, { id }: { id: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(performanceCycles).where(and(eq(performanceCycles.id, id), eq(performanceCycles.ownerId, ownerId))).returning();
+      return deleted.length > 0;
+    },
+    reorderPerformanceCycleUsers: async (_: unknown, { cycleId, userIds }: { cycleId: number; userIds: number[] }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [cycle] = await db.select().from(performanceCycles).where(and(eq(performanceCycles.id, cycleId), eq(performanceCycles.ownerId, ownerId)));
+      if (!cycle) throw new Error("Performance cycle not found");
+      await Promise.all(
+        userIds.map((userId, index) =>
+          db.update(performanceCycleMembers).set({ sortOrder: index }).where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)))
+        )
+      );
       return true;
     },
   },

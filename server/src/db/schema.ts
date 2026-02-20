@@ -196,3 +196,18 @@ export const jiraConfig = pgTable("jira_config", {
   storyPointsFieldId: text("story_points_field_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const performanceCycles = pgTable("performance_cycles", {
+  id: serial("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
+  title: text("title").notNull(),
+  cycleMonth: text("cycle_month").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const performanceCycleMembers = pgTable("performance_cycle_members", {
+  id: serial("id").primaryKey(),
+  cycleId: integer("cycle_id").notNull().references(() => performanceCycles.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+});

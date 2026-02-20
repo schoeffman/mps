@@ -8,6 +8,8 @@ import Login from "./routes/login";
 import Root from "./routes/root";
 import Users from "./routes/users";
 import Tenure from "./routes/tenure";
+import PerformanceCycles from "./routes/performance-cycles";
+import PerformanceCycleDetail from "./routes/performance-cycle-detail";
 import Teams from "./routes/teams";
 import TeamDetail from "./routes/team-detail";
 import UserDetail from "./routes/user-detail";
@@ -33,6 +35,8 @@ const router = createBrowserRouter([
           { index: true, element: <Dashboard /> },
           { path: "users", element: <Users /> },
           { path: "users/tenure", element: <Tenure /> },
+          { path: "users/performance-cycles", element: <PerformanceCycles /> },
+          { path: "users/performance-cycles/:id", element: <PerformanceCycleDetail /> },
           { path: "users/:id", element: <UserDetail /> },
           { path: "teams", element: <Teams /> },
           { path: "teams/:id", element: <TeamDetail /> },
