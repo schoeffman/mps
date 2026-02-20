@@ -89,11 +89,17 @@ const REMOVE_SPACE_MEMBER = gql`
   }
 `;
 
+const LEAVE_SPACE = gql`
+  mutation LeaveSpace($ownerAuthId: String!) {
+    leaveSpace(ownerAuthId: $ownerAuthId)
+  }
+`;
+
 export default function Settings() {
   const { data: session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const { isOwner } = useSpace();
+  const { isOwner, spaces, switchSpace } = useSpace();
   const [deleteMyAccount] = useMutation(DELETE_MY_ACCOUNT);
   const [email, setEmail] = useState("");
   const [addError, setAddError] = useState("");
@@ -113,6 +119,9 @@ export default function Settings() {
 
   const [addSpaceMember, { loading: adding }] = useMutation(ADD_SPACE_MEMBER);
   const [removeSpaceMember] = useMutation(REMOVE_SPACE_MEMBER);
+  const [leaveSpace] = useMutation(LEAVE_SPACE);
+
+  const joinedSpaces = spaces.filter((s) => !s.isOwner);
 
   const user = session?.user;
 
@@ -154,6 +163,17 @@ export default function Settings() {
       refetchMembers();
     } catch {
       alert("Failed to remove member.");
+    }
+  }
+
+  async function handleLeaveSpace(ownerAuthId: string) {
+    try {
+      await leaveSpace({ variables: { ownerAuthId } });
+      // If we were viewing that space, switch back to own space
+      const ownSpace = spaces.find((s) => s.isOwner);
+      if (ownSpace) switchSpace(ownSpace.id);
+    } catch {
+      alert("Failed to leave space.");
     }
   }
 
@@ -223,6 +243,50 @@ export default function Settings() {
           {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
         </Button>
       </section>
+
+      {/* Spaces I've Joined */}
+      {joinedSpaces.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-medium mb-4">Spaces I've Joined</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Spaces you have been given access to by their owners.
+          </p>
+          <div className="space-y-2">
+            {joinedSpaces.map((space) => (
+              <div key={space.id} className="flex items-center gap-3 rounded-lg border p-3">
+                {space.image ? (
+                  <img src={space.image} alt="" className="size-8 rounded-full" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="size-8 rounded-full bg-muted" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{space.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{space.email}</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">Leave</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Leave {space.name}'s space?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You will lose access to {space.name}'s data. The owner can re-add you later.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleLeaveSpace(space.id)}>
+                        Leave
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Jira Integration — only in own space */}
       {isOwner && (

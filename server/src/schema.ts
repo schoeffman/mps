@@ -397,6 +397,7 @@ export const typeDefs = gql`
     linkAuthUser(appUserId: Int!): Boolean!
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
+    leaveSpace(ownerAuthId: String!): Boolean!
     saveJiraConfig(domain: String!, email: String!, apiToken: String!, storyPointsFieldId: String): JiraConfig!
     removeJiraConfig: Boolean!
     transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
@@ -1538,6 +1539,11 @@ export const resolvers = {
     removeSpaceMember: async (_: unknown, { memberAuthId }: { memberAuthId: string }, context: Context) => {
       const { user } = requireAuth(context);
       const deleted = await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceOwnerId, user.id), eq(spaceMembers.memberAuthId, memberAuthId))).returning();
+      return deleted.length > 0;
+    },
+    leaveSpace: async (_: unknown, { ownerAuthId }: { ownerAuthId: string }, context: Context) => {
+      const { user } = requireAuth(context);
+      const deleted = await db.delete(spaceMembers).where(and(eq(spaceMembers.spaceOwnerId, ownerAuthId), eq(spaceMembers.memberAuthId, user.id))).returning();
       return deleted.length > 0;
     },
     toggleProjectChecklistItem: async (_: unknown, { projectId, itemKey }: { projectId: number; itemKey: string }, context: Context) => {
