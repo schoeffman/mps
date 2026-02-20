@@ -37,7 +37,10 @@ export default function Performance() {
   const users: { id: number; fullName: string; jobLevel: string; levelStartDate: string | null }[] =
     usersData?.users ?? [];
 
-  const tracked = users.filter((u) => limitMap.has(u.jobLevel));
+  const levelOrder = ["Junior", "Mid", "Senior", "Staff", "Principal"];
+  const tracked = users
+    .filter((u) => limitMap.has(u.jobLevel))
+    .sort((a, b) => levelOrder.indexOf(a.jobLevel) - levelOrder.indexOf(b.jobLevel));
 
   return (
     <>
