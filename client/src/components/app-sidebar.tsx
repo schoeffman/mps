@@ -26,7 +26,17 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <span className="text-lg font-semibold px-2">MPS</span>
+        <div className="flex items-center justify-between px-2">
+          <span className="text-lg font-semibold">MPS</span>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -87,16 +97,6 @@ export function AppSidebar() {
                     <SlidersHorizontal className="size-4" />
                     Space Settings
                   </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={toggleTheme}>
-                  {theme === "dark" ? (
-                    <Sun className="size-4" />
-                  ) : (
-                    <Moon className="size-4" />
-                  )}
-                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
