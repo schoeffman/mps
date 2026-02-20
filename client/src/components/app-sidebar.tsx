@@ -1,5 +1,5 @@
-import { NavLink, Link, useNavigate } from "react-router-dom";
-import { Moon, Sun, LayoutDashboard, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut, SlidersHorizontal } from "lucide-react";
+import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
+import { Moon, Sun, LayoutDashboard, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut, SlidersHorizontal, ChevronRight } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
@@ -14,14 +14,20 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const { data: session } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const user = session?.user;
+  const usersOpen = location.pathname.startsWith("/users");
 
   return (
     <Sidebar>
@@ -44,56 +50,79 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/" end className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname === "/"}>
+                  <NavLink to="/" end>
                     <LayoutDashboard className="size-4" />
                     Dashboard
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/users" className={({ isActive }) => isActive ? "font-semibold" : ""}>
-                    <Users className="size-4" />
-                    Users
-                  </NavLink>
-                </SidebarMenuButton>
+                <Collapsible defaultOpen={usersOpen}>
+                  <div className="flex items-center">
+                    <SidebarMenuButton asChild className="flex-1" isActive={location.pathname === "/users"}>
+                      <NavLink to="/users" end>
+                        <Users className="size-4" />
+                        Users
+                      </NavLink>
+                    </SidebarMenuButton>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="group flex size-7 shrink-0 items-center justify-center rounded-md hover:bg-accent transition-colors"
+                      >
+                        <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+                      </button>
+                    </CollapsibleTrigger>
+                  </div>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={location.pathname === "/users/performance"}>
+                          <NavLink to="/users/performance">
+                            Performance
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </Collapsible>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/teams" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/teams")}>
+                  <NavLink to="/teams">
                     <UsersRound className="size-4" />
                     Teams
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/projects" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/projects")}>
+                  <NavLink to="/projects">
                     <FolderKanban className="size-4" />
                     Projects
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/schedules" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/schedules")}>
+                  <NavLink to="/schedules">
                     <CalendarDays className="size-4" />
                     Schedules
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/work-history" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/work-history")}>
+                  <NavLink to="/work-history">
                     <ClipboardList className="size-4" />
                     Work History
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink to="/space-settings" className={({ isActive }) => isActive ? "font-semibold" : ""}>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/space-settings")}>
+                  <NavLink to="/space-settings">
                     <SlidersHorizontal className="size-4" />
                     Space Settings
                   </NavLink>
