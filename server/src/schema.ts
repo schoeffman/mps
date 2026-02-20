@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, projectChecklistCompletions } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
 import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue, searchJiraUsers, assignJiraIssue } from "./lib/jira-client.js";
@@ -144,6 +144,11 @@ export const typeDefs = gql`
     members: [User!]!
     links: [ProjectLink!]!
     createdAt: String!
+  }
+
+  type JobLevelLimit {
+    jobLevel: JobLevel!
+    limitMonths: Int!
   }
 
   type JiraConfig {
@@ -327,6 +332,7 @@ export const typeDefs = gql`
     me: SessionInfo
     mySpaces: [Space!]!
     spaceMembers: [SpaceMember!]!
+    jobLevelLimits: [JobLevelLimit!]!
     jiraConfig: JiraConfig
     jiraIssues(projectId: Int!): [JiraIssue!]!
     jiraTransitions(issueKey: String!): [JiraTransition!]!
@@ -398,6 +404,7 @@ export const typeDefs = gql`
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
     leaveSpace(ownerAuthId: String!): Boolean!
+    setJobLevelLimit(jobLevel: JobLevel!, limitMonths: Int!): JobLevelLimit!
     saveJiraConfig(domain: String!, email: String!, apiToken: String!, storyPointsFieldId: String): JiraConfig!
     removeJiraConfig: Boolean!
     transitionJiraIssue(issueKey: String!, transitionId: String!): Boolean!
@@ -889,6 +896,13 @@ export const resolvers = {
         const u = userMap.get(r.memberAuthId);
         return { id: r.id, authId: r.memberAuthId, email: u?.email ?? "", name: u?.name ?? "", image: u?.image ?? null, createdAt: r.createdAt.toISOString() };
       });
+    },
+    jobLevelLimits: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const levels = ["Junior", "Mid", "Senior", "Staff", "Principal"] as const;
+      const rows = await db.select().from(jobLevelLimits).where(eq(jobLevelLimits.ownerId, ownerId));
+      const map = new Map(rows.map((r) => [r.jobLevel, r.limitMonths]));
+      return levels.map((level) => ({ jobLevel: level, limitMonths: map.get(level) ?? 0 }));
     },
     jiraConfig: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
@@ -1508,6 +1522,15 @@ export const resolvers = {
       const ownerId = getOwnerId(context);
       const deleted = await db.delete(jiraConfig).where(eq(jiraConfig.ownerId, ownerId)).returning();
       return deleted.length > 0;
+    },
+    setJobLevelLimit: async (_: unknown, { jobLevel, limitMonths }: { jobLevel: string; limitMonths: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .insert(jobLevelLimits)
+        .values({ ownerId, jobLevel, limitMonths })
+        .onConflictDoUpdate({ target: [jobLevelLimits.ownerId, jobLevelLimits.jobLevel], set: { limitMonths } })
+        .returning();
+      return { jobLevel: row.jobLevel, limitMonths: row.limitMonths };
     },
     transitionJiraIssue: async (_: unknown, { issueKey, transitionId }: { issueKey: string; transitionId: string }, context: Context) => {
       const ownerId = getOwnerId(context);

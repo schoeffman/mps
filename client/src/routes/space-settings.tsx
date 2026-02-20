@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, gql } from "@apollo/client";
 import { X } from "lucide-react";
 import { useSpace } from "@/lib/space-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,9 +86,42 @@ const LEAVE_SPACE = gql`
   }
 `;
 
+const JOB_LEVEL_LIMITS = gql`
+  query JobLevelLimits {
+    jobLevelLimits {
+      jobLevel
+      limitMonths
+    }
+  }
+`;
+
+const SET_JOB_LEVEL_LIMIT = gql`
+  mutation SetJobLevelLimit($jobLevel: JobLevel!, $limitMonths: Int!) {
+    setJobLevelLimit(jobLevel: $jobLevel, limitMonths: $limitMonths) {
+      jobLevel
+      limitMonths
+    }
+  }
+`;
+
 export default function SpaceSettings() {
   const navigate = useNavigate();
   const { isOwner, activeSpace, spaces, switchSpace } = useSpace();
+
+  // Job level limits
+  const { data: jobLevelData } = useQuery(JOB_LEVEL_LIMITS, { skip: !isOwner });
+  const [setJobLevelLimit] = useMutation(SET_JOB_LEVEL_LIMIT);
+  const defaultLimits = [
+    { jobLevel: "Junior", limitMonths: 0 },
+    { jobLevel: "Mid", limitMonths: 0 },
+    { jobLevel: "Senior", limitMonths: 0 },
+    { jobLevel: "Staff", limitMonths: 0 },
+    { jobLevel: "Principal", limitMonths: 0 },
+  ];
+  const [localLimits, setLocalLimits] = useState<{ jobLevel: string; limitMonths: number }[]>(defaultLimits);
+  useEffect(() => {
+    if (jobLevelData?.jobLevelLimits) setLocalLimits(jobLevelData.jobLevelLimits);
+  }, [jobLevelData]);
 
   // Jira config
   const { data: jiraData, refetch: refetchJira } = useQuery(JIRA_CONFIG, { skip: !isOwner });
@@ -181,6 +215,44 @@ export default function SpaceSettings() {
 
       {isOwner ? (
         <>
+          {/* Time in Level Limits */}
+          <section className="mb-8">
+            <details>
+              <summary className="text-lg font-medium cursor-pointer select-none list-item">
+                Time in Level Limits
+              </summary>
+              <p className="text-sm text-muted-foreground mt-2 mb-6">
+                Set the expected maximum time at each job level in months. A value of 0 means no limit.
+              </p>
+              <div className="space-y-6 max-w-sm">
+                {localLimits.map(({ jobLevel, limitMonths }) => (
+                  <div key={jobLevel}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{jobLevel}</span>
+                      <span className="text-sm text-muted-foreground w-24 text-right">
+                        {limitMonths === 0 ? "No limit" : `${limitMonths} month${limitMonths === 1 ? "" : "s"}`}
+                      </span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={[limitMonths]}
+                      onValueChange={([val]) =>
+                        setLocalLimits((prev) =>
+                          prev.map((l) => l.jobLevel === jobLevel ? { ...l, limitMonths: val } : l)
+                        )
+                      }
+                      onValueCommit={([val]) =>
+                        setJobLevelLimit({ variables: { jobLevel, limitMonths: val } })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
+          </section>
+
           {/* Jira Integration */}
           <section className="mb-8">
             <h2 className="text-lg font-medium mb-4">Jira Integration</h2>

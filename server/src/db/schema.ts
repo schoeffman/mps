@@ -178,6 +178,14 @@ export const projectChecklistCompletions = pgTable("project_checklist_completion
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [unique().on(table.projectId, table.itemKey)]);
 
+export const jobLevelLimits = pgTable("job_level_limits", {
+  id: serial("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
+  jobLevel: text("job_level").notNull(),
+  limitMonths: integer("limit_months").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [unique().on(table.ownerId, table.jobLevel)]);
+
 export const jiraConfig = pgTable("jira_config", {
   id: serial("id").primaryKey(),
   ownerId: text("owner_id").notNull().unique().references(() => authUser.id),
