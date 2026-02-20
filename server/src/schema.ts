@@ -134,7 +134,7 @@ export const typeDefs = gql`
     id: Int!
     name: String!
     targetDate: String!
-    dri: User!
+    dri: User
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
@@ -202,7 +202,7 @@ export const typeDefs = gql`
   input UpdateProjectInput {
     name: String!
     targetDate: String!
-    driId: Int!
+    driId: Int
     status: ProjectStatus!
     color: String!
     projectType: ProjectType!
@@ -559,7 +559,9 @@ async function ensureSystemProjects(ownerId: string) {
 }
 
 async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
-  const [driRow] = await db.select().from(users).where(eq(users.id, projectRow.driId));
+  const [driRow] = projectRow.driId != null
+    ? await db.select().from(users).where(eq(users.id, projectRow.driId))
+    : [];
   const memberRows = await db
     .select({ user: users })
     .from(projectMembers)
@@ -1128,11 +1130,8 @@ export const resolvers = {
         throw new Error(`Cannot delete user: they are the lead of team "${teamLead.name}"`);
       }
 
-      // Check if user is a project DRI (only within owner's projects)
-      const [projectDri] = await db.select().from(projects).where(and(eq(projects.driId, id), eq(projects.ownerId, ownerId)));
-      if (projectDri) {
-        throw new Error(`Cannot delete user: they are the DRI of project "${projectDri.name}"`);
-      }
+      // Null out DRI on any projects where this user is the DRI
+      await db.update(projects).set({ driId: null }).where(and(eq(projects.driId, id), eq(projects.ownerId, ownerId)));
 
       // Remove from team memberships
       await db.delete(teamMembers).where(eq(teamMembers.userId, id));
@@ -1249,10 +1248,12 @@ export const resolvers = {
         .returning();
       if (!projectRow) throw new Error("Project not found");
 
-      // Ensure DRI is a member
-      const existingMembers = await db.select().from(projectMembers).where(eq(projectMembers.projectId, id));
-      if (!existingMembers.some((m) => m.userId === input.driId)) {
-        await db.insert(projectMembers).values([{ projectId: id, userId: input.driId }]);
+      // Ensure DRI is a member (if one is set)
+      if (input.driId != null) {
+        const existingMembers = await db.select().from(projectMembers).where(eq(projectMembers.projectId, id));
+        if (!existingMembers.some((m) => m.userId === input.driId)) {
+          await db.insert(projectMembers).values([{ projectId: id, userId: input.driId }]);
+        }
       }
 
       return mapProjectFromDb(projectRow);

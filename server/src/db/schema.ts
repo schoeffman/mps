@@ -90,7 +90,6 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   targetDate: text("target_date").notNull(),
   driId: integer("dri_id")
-    .notNull()
     .references(() => users.id),
   status: text("status").notNull().default("Explore"),
   color: text("color").notNull().default("blue"),

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_USERS } from "@/routes/users";
+import { GET_PROJECTS } from "@/routes/projects";
 import { ArrowLeft, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditUserDialog } from "@/components/edit-user-dialog";
@@ -113,7 +114,7 @@ export default function UserDetail() {
     variables: { userId: Number(id), limit: 10 },
   });
   const [deleteUser] = useMutation(DELETE_USER, {
-    refetchQueries: [{ query: GET_USERS }],
+    refetchQueries: [{ query: GET_USERS }, { query: GET_PROJECTS }],
   });
 
   if (loading) return <p>Loading...</p>;

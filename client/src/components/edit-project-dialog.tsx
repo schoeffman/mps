@@ -55,7 +55,7 @@ interface EditProjectDialogProps {
     id: number;
     name: string;
     targetDate: string;
-    dri: { id: number; fullName: string };
+    dri: { id: number; fullName: string } | null;
     status: string;
     color: string;
     projectType: string;
@@ -72,7 +72,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
   const [status, setStatus] = useState(project.status);
   const [color, setColor] = useState(project.color);
   const [projectType, setProjectType] = useState(project.projectType);
-  const [driId, setDriId] = useState<string>(String(project.dri.id));
+  const [driId, setDriId] = useState<string>(project.dri ? String(project.dri.id) : "none");
   const [jiraProjectKey, setJiraProjectKey] = useState(project.jiraProjectKey ?? "");
   const [atlassianProjectKey, setAtlassianProjectUrl] = useState(project.atlassianProjectKey ?? "");
 
@@ -90,7 +90,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     setStatus(project.status);
     setColor(project.color);
     setProjectType(project.projectType);
-    setDriId(String(project.dri.id));
+    setDriId(project.dri ? String(project.dri.id) : "none");
     setJiraProjectKey(project.jiraProjectKey ?? "");
     setAtlassianProjectUrl(project.atlassianProjectKey ?? "");
   }
@@ -107,7 +107,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
     await updateProject({
       variables: {
         id: project.id,
-        input: { name, targetDate, driId: Number(driId), status, color, projectType, jiraProjectKey: jiraProjectKey.trim() || null, atlassianProjectKey: atlassianProjectKey.trim() || null },
+        input: { name, targetDate, driId: driId !== "none" ? Number(driId) : null, status, color, projectType, jiraProjectKey: jiraProjectKey.trim() || null, atlassianProjectKey: atlassianProjectKey.trim() || null },
       },
     });
     setOpen(false);
@@ -201,6 +201,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
                 <SelectValue placeholder="Select DRI" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Unassigned</SelectItem>
                 {allUsers.map((user) => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.fullName}
@@ -235,7 +236,7 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
 
           <Button
             type="submit"
-            disabled={loading || !name || !targetDate || !driId}
+            disabled={loading || !name || !targetDate}
           >
             {loading ? "Saving..." : "Save"}
           </Button>

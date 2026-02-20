@@ -27,7 +27,7 @@ interface Project {
   id: number;
   name: string;
   targetDate: string;
-  dri: { id: number; fullName: string };
+  dri: { id: number; fullName: string } | null;
   status: string;
   color: string;
   projectType: string;
@@ -75,7 +75,7 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
                     {project.name}
                   </Link>
                 </TableCell>
-                <TableCell>{project.dri.fullName}</TableCell>
+                <TableCell>{project.dri?.fullName ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">
                     {project.projectType === "FeatureDevelopment" ? "Feature Development" : project.projectType === "Maintenance" ? "Maintenance" : "Other"}

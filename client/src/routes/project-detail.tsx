@@ -488,7 +488,7 @@ export default function ProjectDetail() {
       })()}
 
       <div className="mb-6 text-sm text-muted-foreground space-y-1">
-        <p>DRI: {project.dri.fullName}</p>
+        <p>DRI: {project.dri?.fullName ?? "Unassigned"}</p>
         <p>Type: {formatEnum(project.projectType)}</p>
         <p>Status: {project.status}</p>
         <p>Target Date: {new Date(project.targetDate).toLocaleDateString()}</p>

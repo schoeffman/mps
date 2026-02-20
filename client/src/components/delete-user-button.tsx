@@ -1,5 +1,6 @@
 import { useMutation, gql } from "@apollo/client";
 import { GET_USERS } from "@/routes/users";
+import { GET_PROJECTS } from "@/routes/projects";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +29,7 @@ export function DeleteUserButton({
   userName: string;
 }) {
   const [deleteUser] = useMutation(DELETE_USER, {
-    refetchQueries: [{ query: GET_USERS }],
+    refetchQueries: [{ query: GET_USERS }, { query: GET_PROJECTS }],
   });
 
   return (
