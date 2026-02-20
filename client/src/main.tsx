@@ -15,6 +15,7 @@ import ProjectDetail from "./routes/project-detail";
 import Schedules from "./routes/schedules";
 import ScheduleDetail from "./routes/schedule-detail";
 import Settings from "./routes/settings";
+import SpaceSettings from "./routes/space-settings";
 import WorkHistory from "./routes/work-history";
 import Dashboard from "./routes/dashboard";
 import "./index.css";
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
           { path: "schedules/:id", element: <ScheduleDetail /> },
           { path: "work-history", element: <WorkHistory /> },
           { path: "settings", element: <Settings /> },
+          { path: "space-settings", element: <SpaceSettings /> },
         ],
       },
     ],
