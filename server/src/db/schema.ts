@@ -210,4 +210,5 @@ export const performanceCycleMembers = pgTable("performance_cycle_members", {
   cycleId: integer("cycle_id").notNull().references(() => performanceCycles.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   sortOrder: integer("sort_order").notNull().default(0),
+  rating: text("rating"),
 });

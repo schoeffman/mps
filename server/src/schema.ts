@@ -74,6 +74,7 @@ export const typeDefs = gql`
     jobLevel: JobLevel!
     levelStartDate: String
     craftFocus: CraftFocus!
+    rating: String
     createdAt: String!
   }
 
@@ -443,6 +444,7 @@ export const typeDefs = gql`
     updatePerformanceCycle(id: Int!, input: UpdatePerformanceCycleInput!): PerformanceCycle!
     deletePerformanceCycle(id: Int!): Boolean!
     reorderPerformanceCycleUsers(cycleId: Int!, userIds: [Int!]!): Boolean!
+    setPerformanceCycleMemberRating(cycleId: Int!, userId: Int!, rating: String): Boolean!
   }
 `;
 
@@ -624,7 +626,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
 
 async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSelect) {
   const memberRows = await db
-    .select({ user: users })
+    .select({ user: users, rating: performanceCycleMembers.rating })
     .from(performanceCycleMembers)
     .innerJoin(users, eq(performanceCycleMembers.userId, users.id))
     .where(eq(performanceCycleMembers.cycleId, row.id))
@@ -633,7 +635,7 @@ async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSel
     id: row.id,
     title: row.title,
     cycleMonth: row.cycleMonth,
-    users: memberRows.map((r) => mapUserFromDb(r.user)),
+    users: memberRows.map((r) => ({ ...mapUserFromDb(r.user), rating: r.rating })),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -1778,6 +1780,15 @@ export const resolvers = {
           db.update(performanceCycleMembers).set({ sortOrder: index }).where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)))
         )
       );
+      return true;
+    },
+    setPerformanceCycleMemberRating: async (_: unknown, { cycleId, userId, rating }: { cycleId: number; userId: number; rating: string | null }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [cycle] = await db.select().from(performanceCycles).where(and(eq(performanceCycles.id, cycleId), eq(performanceCycles.ownerId, ownerId)));
+      if (!cycle) throw new Error("Performance cycle not found");
+      await db.update(performanceCycleMembers)
+        .set({ rating })
+        .where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)));
       return true;
     },
   },

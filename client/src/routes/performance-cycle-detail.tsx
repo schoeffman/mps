@@ -31,6 +31,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -42,9 +49,24 @@ import {
 interface CycleUser {
   id: number;
   fullName: string;
-  craftAbility: string;
   jobLevel: string;
+  rating: string | null;
 }
+
+const RATINGS: { value: string | null; label: string; dotClass: string; textClass: string }[] = [
+  { value: null,                     label: "Unrated",                  dotClass: "bg-gray-300",    textClass: "text-gray-400" },
+  { value: "GreatlyExceeding",       label: "Greatly Exceeding",        dotClass: "bg-purple-500",  textClass: "text-purple-600" },
+  { value: "Exceeding",              label: "Exceeding",                dotClass: "bg-green-500",   textClass: "text-green-600" },
+  { value: "MetExpectations",        label: "Met Expectations",         dotClass: "bg-blue-500",    textClass: "text-blue-600" },
+  { value: "MetMostExpectations",    label: "Met Most Expectations",    dotClass: "bg-amber-400",   textClass: "text-amber-500" },
+  { value: "DidNotMeetExpectations", label: "Did Not Meet Expectations",dotClass: "bg-red-500",     textClass: "text-red-600" },
+  { value: "NotEligible",            label: "Not Eligible",             dotClass: "bg-gray-400",    textClass: "text-gray-500" },
+];
+
+const UNRATED_KEY = "__unrated__";
+function ratingToKey(r: string | null) { return r ?? UNRATED_KEY; }
+function keyToRating(k: string): string | null { return k === UNRATED_KEY ? null : k; }
+function ratingConfig(r: string | null) { return RATINGS.find((x) => x.value === r) ?? RATINGS[0]; }
 
 const GET_PERFORMANCE_CYCLE = gql`
   query GetPerformanceCycle($id: Int!) {
@@ -55,8 +77,8 @@ const GET_PERFORMANCE_CYCLE = gql`
       users {
         id
         fullName
-        craftAbility
         jobLevel
+        rating
       }
       createdAt
     }
@@ -75,6 +97,12 @@ const REORDER_PERFORMANCE_CYCLE_USERS = gql`
   }
 `;
 
+const SET_RATING = gql`
+  mutation SetPerformanceCycleMemberRating($cycleId: Int!, $userId: Int!, $rating: String) {
+    setPerformanceCycleMemberRating(cycleId: $cycleId, userId: $userId, rating: $rating)
+  }
+`;
+
 function formatCycleMonth(cycleMonth: string) {
   return new Date(cycleMonth + "-01").toLocaleDateString(undefined, {
     month: "long",
@@ -83,16 +111,46 @@ function formatCycleMonth(cycleMonth: string) {
   });
 }
 
-const enumLabels: Record<string, string> = {
-  ProductManagement: "Product Management",
-  DataScience: "Data Science",
-};
 
-function formatEnum(value: string) {
-  return enumLabels[value] ?? value;
+function RatingSelect({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (rating: string | null) => void;
+}) {
+  const cfg = ratingConfig(value);
+  return (
+    <Select value={ratingToKey(value)} onValueChange={(k) => onChange(keyToRating(k))}>
+      <SelectTrigger className="w-52 gap-2">
+        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${cfg.dotClass}`} />
+        <span className={`truncate ${cfg.textClass}`}>
+          <SelectValue />
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {RATINGS.map((r) => (
+          <SelectItem key={ratingToKey(r.value)} value={ratingToKey(r.value)}>
+            <span className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${r.dotClass}`} />
+              <span className={r.textClass}>{r.label}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
-function SortableUserRow({ user }: { user: CycleUser }) {
+function SortableUserRow({
+  user,
+  cycleId,
+  onRatingChange,
+}: {
+  user: CycleUser;
+  cycleId: number;
+  onRatingChange: (userId: number, rating: string | null) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: user.id });
 
@@ -119,17 +177,23 @@ function SortableUserRow({ user }: { user: CycleUser }) {
           {user.fullName}
         </Link>
       </TableCell>
-      <TableCell>{formatEnum(user.craftAbility)}</TableCell>
       <TableCell>{user.jobLevel}</TableCell>
+      <TableCell>
+        <RatingSelect
+          value={user.rating}
+          onChange={(rating) => onRatingChange(user.id, rating)}
+        />
+      </TableCell>
     </TableRow>
   );
 }
 
 export default function PerformanceCycleDetail() {
   const { id } = useParams();
+  const cycleId = Number(id);
   const navigate = useNavigate();
   const { loading, error, data } = useQuery(GET_PERFORMANCE_CYCLE, {
-    variables: { id: Number(id) },
+    variables: { id: cycleId },
   });
   const [users, setUsers] = useState<CycleUser[]>([]);
   const [saved, setSaved] = useState(false);
@@ -144,18 +208,41 @@ export default function PerformanceCycleDetail() {
 
   const [reorderUsers] = useMutation(REORDER_PERFORMANCE_CYCLE_USERS, {
     update(cache, _, { variables }) {
-      const { cycleId, userIds } = variables as { cycleId: number; userIds: number[] };
+      const { cycleId: cid, userIds } = variables as { cycleId: number; userIds: number[] };
       const existing = cache.readQuery<{ performanceCycle: { users: CycleUser[] } & Record<string, unknown> }>({
         query: GET_PERFORMANCE_CYCLE,
-        variables: { id: cycleId },
+        variables: { id: cid },
       });
       if (!existing?.performanceCycle) return;
       const byId = new Map(existing.performanceCycle.users.map((u) => [u.id, u]));
       const reordered = userIds.map((uid) => byId.get(uid)).filter(Boolean) as CycleUser[];
       cache.writeQuery({
         query: GET_PERFORMANCE_CYCLE,
-        variables: { id: cycleId },
+        variables: { id: cid },
         data: { performanceCycle: { ...existing.performanceCycle, users: reordered } },
+      });
+    },
+  });
+
+  const [setRating] = useMutation(SET_RATING, {
+    update(cache, _, { variables }) {
+      const { cycleId: cid, userId, rating } = variables as { cycleId: number; userId: number; rating: string | null };
+      const existing = cache.readQuery<{ performanceCycle: { users: CycleUser[] } & Record<string, unknown> }>({
+        query: GET_PERFORMANCE_CYCLE,
+        variables: { id: cid },
+      });
+      if (!existing?.performanceCycle) return;
+      cache.writeQuery({
+        query: GET_PERFORMANCE_CYCLE,
+        variables: { id: cid },
+        data: {
+          performanceCycle: {
+            ...existing.performanceCycle,
+            users: existing.performanceCycle.users.map((u) =>
+              u.id === userId ? { ...u, rating } : u
+            ),
+          },
+        },
       });
     },
   });
@@ -169,10 +256,15 @@ export default function PerformanceCycleDetail() {
     const newIndex = users.findIndex((u) => u.id === over.id);
     const newOrder = arrayMove(users, oldIndex, newIndex);
     setUsers(newOrder);
-    reorderUsers({ variables: { cycleId: Number(id), userIds: newOrder.map((u) => u.id) } }).then(() => {
+    reorderUsers({ variables: { cycleId, userIds: newOrder.map((u) => u.id) } }).then(() => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     });
+  }
+
+  function handleRatingChange(userId: number, rating: string | null) {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, rating } : u)));
+    setRating({ variables: { cycleId, userId, rating } });
   }
 
   if (loading) return <p>Loading...</p>;
@@ -182,7 +274,7 @@ export default function PerformanceCycleDetail() {
   const { performanceCycle: cycle } = data;
 
   async function handleDelete() {
-    await deleteCycle({ variables: { id: Number(id) } });
+    await deleteCycle({ variables: { id: cycleId } });
     navigate("/users/performance-cycles");
   }
 
@@ -243,13 +335,18 @@ export default function PerformanceCycleDetail() {
               <TableRow>
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Craft Ability</TableHead>
                 <TableHead>Job Level</TableHead>
+                <TableHead>Rating</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map((user) => (
-                <SortableUserRow key={user.id} user={user} />
+                <SortableUserRow
+                  key={user.id}
+                  user={user}
+                  cycleId={cycleId}
+                  onRatingChange={handleRatingChange}
+                />
               ))}
             </TableBody>
           </Table>
