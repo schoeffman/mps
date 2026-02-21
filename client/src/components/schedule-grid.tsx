@@ -325,10 +325,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
             {sortedTeams.map((team) => (
               <>
                 <tr key={`team-${team.id}`}>
-                  <td
-                    colSpan={weekStarts.length + 1}
-                    className="bg-muted/50 px-3 py-1.5 font-semibold text-muted-foreground border-b"
-                  >
+                  <td className="sticky left-0 z-10 bg-muted/50 px-3 py-1.5 font-semibold text-muted-foreground border-b border-r">
                     <RowProjectPicker
                       memberName={team.name}
                       projects={assignableProjects}
@@ -336,6 +333,7 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
                       onSelectProject={(projectId) => handleTeamAssign(team, projectId)}
                     />
                   </td>
+                  <td colSpan={weekStarts.length} className="bg-muted/50 border-b" />
                 </tr>
                 {team.members.map((member) => (
                   <tr key={`member-${member.id}`} className="border-b">
