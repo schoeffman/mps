@@ -354,6 +354,7 @@ export const typeDefs = gql`
     projectAssignments(projectId: Int!): [ProjectAssignment!]!
     userSchedule(userId: Int!): [UserScheduleEntry!]!
     userWorkHistory(userId: Int!, limit: Int): [WorkHistoryEntry!]!
+    userWorkHistoryByProject(userId: Int!, startDate: String!, endDate: String!): [UserScheduleEntry!]!
     me: SessionInfo
     mySpaces: [Space!]!
     spaceMembers: [SpaceMember!]!
@@ -911,6 +912,77 @@ export const resolvers = {
           };
         }),
       );
+    },
+    userWorkHistoryByProject: async (_: unknown, { userId, startDate, endDate }: { userId: number; startDate: string; endDate: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [userRow] = await db.select().from(users).where(and(eq(users.id, userId), eq(users.ownerId, ownerId)));
+      if (!userRow) throw new Error("User not found");
+
+      const rows = await db
+        .select()
+        .from(workHistory)
+        .where(and(
+          eq(workHistory.ownerId, ownerId),
+          eq(workHistory.userId, userId),
+          gte(workHistory.date, startDate),
+          lte(workHistory.date, endDate),
+        ))
+        .orderBy(asc(workHistory.date));
+
+      if (rows.length === 0) return [];
+
+      // Group by projectId, then by scheduleId (null = manually entered)
+      const byProject = new Map<number, Map<string, { scheduleName: string; dates: string[] }>>();
+      for (const row of rows) {
+        if (!byProject.has(row.projectId)) byProject.set(row.projectId, new Map());
+        const scheduleKey = row.scheduleId ? String(row.scheduleId) : "__manual__";
+        const projectMap = byProject.get(row.projectId)!;
+        if (!projectMap.has(scheduleKey)) {
+          let scheduleName = "Manually Entered";
+          if (row.scheduleId) {
+            const [scheduleRow] = await db.select().from(schedules).where(eq(schedules.id, row.scheduleId));
+            scheduleName = scheduleRow?.name ?? "Unknown";
+          }
+          projectMap.set(scheduleKey, { scheduleName, dates: [] });
+        }
+        projectMap.get(scheduleKey)!.dates.push(row.date);
+      }
+
+      const results = [];
+      for (const [projectId, scheduleMap] of byProject) {
+        const [projectRow] = await db.select().from(projects).where(eq(projects.id, projectId));
+        if (!projectRow) continue;
+
+        // Merge consecutive days into date ranges per schedule group
+        const dateRanges: { start: string; end: string; scheduleName: string; scheduleId: number }[] = [];
+        for (const [scheduleKey, { scheduleName, dates }] of scheduleMap) {
+          const scheduleId = scheduleKey === "__manual__" ? -1 : Number(scheduleKey);
+          dates.sort();
+          let rangeStart = dates[0];
+          let rangeEnd = dates[0];
+          for (let i = 1; i < dates.length; i++) {
+            const prev = new Date(rangeEnd + "T00:00:00");
+            const curr = new Date(dates[i] + "T00:00:00");
+            const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+            if (diffDays === 1) {
+              rangeEnd = dates[i];
+            } else {
+              dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName, scheduleId });
+              rangeStart = dates[i];
+              rangeEnd = dates[i];
+            }
+          }
+          dateRanges.push({ start: rangeStart, end: rangeEnd, scheduleName, scheduleId });
+        }
+        dateRanges.sort((a, b) => a.start.localeCompare(b.start));
+
+        results.push({
+          project: await mapProjectFromDb(projectRow),
+          dateRanges,
+        });
+      }
+
+      return results;
     },
     me: (_: unknown, __: unknown, context: Context) => {
       if (!context.session) return null;

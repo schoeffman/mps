@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { GET_USERS } from "@/routes/users";
 import { GET_PROJECTS } from "@/routes/projects";
 import { ArrowLeft, Trash2, AlertTriangle } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EditUserDialog } from "@/components/edit-user-dialog";
 import {
@@ -58,17 +59,19 @@ const GET_USER_SCHEDULE = gql`
   }
 `;
 
-const GET_USER_WORK_HISTORY = gql`
-  query GetUserWorkHistory($userId: Int!, $limit: Int) {
-    userWorkHistory(userId: $userId, limit: $limit) {
-      id
-      date
+const GET_USER_WORK_HISTORY_BY_PROJECT = gql`
+  query GetUserWorkHistoryByProject($userId: Int!, $startDate: String!, $endDate: String!) {
+    userWorkHistoryByProject(userId: $userId, startDate: $startDate, endDate: $endDate) {
       project {
         id
         name
-        color
       }
-      scheduleName
+      dateRanges {
+        start
+        end
+        scheduleName
+        scheduleId
+      }
     }
   }
 `;
@@ -111,8 +114,12 @@ export default function UserDetail() {
   const { data: scheduleData } = useQuery(GET_USER_SCHEDULE, {
     variables: { userId: Number(id) },
   });
-  const { data: workHistoryData } = useQuery(GET_USER_WORK_HISTORY, {
-    variables: { userId: Number(id), limit: 10 },
+  const today = new Date().toISOString().split("T")[0];
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const [historyStart, setHistoryStart] = useState(ninetyDaysAgo);
+  const [historyEnd, setHistoryEnd] = useState(today);
+  const { data: workHistoryData, loading: workHistoryLoading } = useQuery(GET_USER_WORK_HISTORY_BY_PROJECT, {
+    variables: { userId: Number(id), startDate: historyStart, endDate: historyEnd },
   });
   const [deleteUser] = useMutation(DELETE_USER, {
     refetchQueries: [{ query: GET_USERS }, { query: GET_PROJECTS }],
@@ -221,32 +228,57 @@ export default function UserDetail() {
       </section>
 
       <section className="mt-6">
-        <h2 className="text-lg font-semibold mb-2">Recent Work History</h2>
-        {workHistoryData?.userWorkHistory?.length > 0 ? (
+        <h2 className="text-lg font-semibold mb-3">Work History</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <Input
+            type="date"
+            value={historyStart}
+            max={historyEnd}
+            onChange={(e) => setHistoryStart(e.target.value)}
+            className="w-[160px]"
+          />
+          <span className="text-muted-foreground text-sm">to</span>
+          <Input
+            type="date"
+            value={historyEnd}
+            min={historyStart}
+            max={today}
+            onChange={(e) => setHistoryEnd(e.target.value)}
+            className="w-[160px]"
+          />
+        </div>
+        {workHistoryLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : workHistoryData?.userWorkHistoryByProject?.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Source</TableHead>
+                <TableHead>Schedule</TableHead>
+                <TableHead>Dates</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {workHistoryData.userWorkHistory.map((entry: { id: number; date: string; project: { id: number; name: string }; scheduleName: string }) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{new Date(entry.date + "T00:00:00").toLocaleDateString()}</TableCell>
-                  <TableCell className="font-medium">
-                    <Link to={`/projects/${entry.project.id}`} className="hover:underline">
-                      {entry.project.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{entry.scheduleName}</TableCell>
-                </TableRow>
-              ))}
+              {workHistoryData.userWorkHistoryByProject.flatMap(
+                (entry: { project: { id: number; name: string }; dateRanges: { start: string; end: string; scheduleName: string; scheduleId: number }[] }) =>
+                  entry.dateRanges.map((range: { start: string; end: string; scheduleName: string; scheduleId: number }, i: number) => (
+                    <TableRow key={`${entry.project.id}-${i}`}>
+                      {i === 0 ? (
+                        <TableCell rowSpan={entry.dateRanges.length} className="font-medium align-top">
+                          <Link to={`/projects/${entry.project.id}`} className="hover:underline">
+                            {entry.project.name}
+                          </Link>
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="text-muted-foreground">{range.scheduleName}</TableCell>
+                      <TableCell>{formatDateRange(range.start, range.end)}</TableCell>
+                    </TableRow>
+                  ))
+              )}
             </TableBody>
           </Table>
         ) : (
-          <p className="text-sm text-muted-foreground">No work history recorded.</p>
+          <p className="text-sm text-muted-foreground">No work history in this date range.</p>
         )}
       </section>
     </>
