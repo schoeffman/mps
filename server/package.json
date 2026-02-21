@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:mark-baseline": "tsx src/db/mark-baseline.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:reseed": "tsx src/db/seed.ts --auto",
     "db:studio": "drizzle-kit studio"
