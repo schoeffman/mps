@@ -34,7 +34,10 @@ server/              Express 4 + Apollo Server (GraphQL) + Drizzle ORM + node-po
 | `npm run dev -w server` | Start server only (tsx watch, auto-reloads) |
 | `npm run build` | Build client for production |
 | `npm start` | Production start (serves built client from Express) |
-| `npm run db:push -w server` | Push Drizzle schema to DB (may hang on prompts — use psql instead) |
+| `npm run db:generate -w server` | Generate a new migration file from schema changes |
+| `npm run db:migrate -w server` | Apply pending migrations to the DB |
+| `npm run db:mark-baseline -w server` | One-time: mark the baseline migration as applied on an existing DB |
+| `npm run db:push -w server` | Directly sync schema to DB without migration files (dev shortcut only) |
 | `npm run db:studio -w server` | Open Drizzle Studio |
 | `npm test` | Run all tests (Vitest, both workspaces) |
 | `npm run test:watch` | Run tests in watch mode |
@@ -111,10 +114,39 @@ APPLE_CLIENT_SECRET=
 DATABASE_URL=postgresql://localhost:5432/mps  # optional, defaults to this
 ```
 
+## Database Migrations
+
+Migration files live in `server/drizzle/`. Always commit them alongside schema changes.
+
+**Making a schema change:**
+```bash
+# 1. Edit server/src/db/schema.ts
+# 2. Generate the migration file
+npm run db:generate -w server
+# 3. Apply it locally
+npm run db:migrate -w server
+# 4. Commit both the schema change and the new file in server/drizzle/
+```
+
+**Applying migrations in production (Railway):**
+```bash
+DATABASE_URL=<railway-url> npm run db:migrate -w server
+```
+
+**First-time setup on an existing database** (run once — marks the baseline as already applied without re-running it):
+```bash
+# Local
+npm run db:mark-baseline -w server
+# Railway
+DATABASE_URL=<railway-url> npm run db:mark-baseline -w server
+```
+
+> Do not use `db:push` for production — it syncs the schema directly with no migration file and no history.
+
 ## Production (Railway)
 
 - Server + DB hosted on Railway
 - `npm start` runs the production server which serves the built client SPA
-- Schema changes require manual `ALTER TABLE` on Railway's DB or `drizzle-kit push` with the production `DATABASE_URL`
+- Schema changes: generate a migration file locally, commit it, then run `db:migrate` against the Railway DB
 - `BETTER_AUTH_URL` and `TRUSTED_ORIGINS` must be set to the production domain
 - Google OAuth redirect URI in Google Console must include `https://<domain>/api/auth/callback/google`
