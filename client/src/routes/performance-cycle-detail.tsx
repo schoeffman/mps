@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   DndContext,
   PointerSensor,
@@ -122,6 +129,17 @@ const SET_RATING = gql`
   }
 `;
 
+const USER_PERFORMANCE_CYCLES = gql`
+  query UserPerformanceCycles($userId: Int!) {
+    userPerformanceCycles(userId: $userId) {
+      cycleId
+      cycleTitle
+      cycleMonth
+      rating
+    }
+  }
+`;
+
 function formatCycleMonth(cycleMonth: string) {
   return new Date(cycleMonth + "-01").toLocaleDateString(undefined, {
     month: "long",
@@ -218,6 +236,50 @@ function TrendSelect({
   );
 }
 
+function UserHistoryTooltip({ userId }: { userId: number }) {
+  const [enabled, setEnabled] = useState(false);
+  const { data, loading } = useQuery(USER_PERFORMANCE_CYCLES, {
+    variables: { userId },
+    skip: !enabled,
+  });
+
+  const cycles: { cycleId: number; cycleTitle: string; cycleMonth: string; rating: string | null }[] =
+    data?.userPerformanceCycles ?? [];
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className="text-muted-foreground hover:text-foreground cursor-default"
+            onMouseEnter={() => setEnabled(true)}
+          >
+            <Info className="h-3.5 w-3.5" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="p-3 w-64">
+          {loading && <p className="text-xs">Loading…</p>}
+          {!loading && cycles.length === 0 && (
+            <p className="text-xs">No cycle history.</p>
+          )}
+          {cycles.map((c) => {
+            const cfg = ratingConfig(c.rating);
+            return (
+              <div key={c.cycleId} className="flex items-center justify-between gap-3 py-0.5 text-xs">
+                <span className="opacity-80">{c.cycleTitle} · {formatCycleMonth(c.cycleMonth)}</span>
+                <span className="flex items-center gap-1 flex-shrink-0">
+                  <span className={`h-1.5 w-1.5 rounded-full ${cfg.dotClass}`} />
+                  <span>{cfg.label}</span>
+                </span>
+              </div>
+            );
+          })}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function SortableUserRow({
   user,
   cycleId,
@@ -251,9 +313,12 @@ function SortableUserRow({
         </button>
       </TableCell>
       <TableCell className="font-medium">
-        <Link to={`/users/${user.id}`} className="hover:underline">
-          {user.fullName}
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <Link to={`/users/${user.id}`} className="hover:underline">
+            {user.fullName}
+          </Link>
+          <UserHistoryTooltip userId={user.id} />
+        </div>
       </TableCell>
       <TableCell>{user.jobLevel}</TableCell>
       <TableCell>

@@ -370,6 +370,14 @@ export const typeDefs = gql`
     projectAtlassianStatuses(projectIds: [Int!]!): [ProjectAtlassianStatus!]!
     performanceCycles: [PerformanceCycle!]!
     performanceCycle(id: Int!): PerformanceCycle
+    userPerformanceCycles(userId: Int!): [UserCycleHistory!]!
+  }
+
+  type UserCycleHistory {
+    cycleId: Int!
+    cycleTitle: String!
+    cycleMonth: String!
+    rating: String
   }
 
   type ScheduledProject {
@@ -1156,6 +1164,21 @@ export const resolvers = {
       const [row] = await db.select().from(performanceCycles).where(and(eq(performanceCycles.id, id), eq(performanceCycles.ownerId, ownerId)));
       if (!row) return null;
       return mapPerformanceCycleFromDb(row);
+    },
+    userPerformanceCycles: async (_: unknown, { userId }: { userId: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const rows = await db
+        .select({
+          cycleId: performanceCycles.id,
+          cycleTitle: performanceCycles.title,
+          cycleMonth: performanceCycles.cycleMonth,
+          rating: performanceCycleMembers.rating,
+        })
+        .from(performanceCycleMembers)
+        .innerJoin(performanceCycles, eq(performanceCycleMembers.cycleId, performanceCycles.id))
+        .where(and(eq(performanceCycleMembers.userId, userId), eq(performanceCycles.ownerId, ownerId)))
+        .orderBy(asc(performanceCycles.cycleMonth));
+      return rows;
     },
   },
   Mutation: {
