@@ -75,6 +75,7 @@ export const typeDefs = gql`
     levelStartDate: String
     craftFocus: CraftFocus!
     rating: String
+    trend: String
     createdAt: String!
   }
 
@@ -445,6 +446,7 @@ export const typeDefs = gql`
     deletePerformanceCycle(id: Int!): Boolean!
     reorderPerformanceCycleUsers(cycleId: Int!, userIds: [Int!]!): Boolean!
     setPerformanceCycleMemberRating(cycleId: Int!, userId: Int!, rating: String): Boolean!
+    setPerformanceCycleMemberTrend(cycleId: Int!, userId: Int!, trend: String): Boolean!
   }
 `;
 
@@ -626,7 +628,7 @@ async function mapProjectFromDb(projectRow: typeof projects.$inferSelect) {
 
 async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSelect) {
   const memberRows = await db
-    .select({ user: users, rating: performanceCycleMembers.rating })
+    .select({ user: users, rating: performanceCycleMembers.rating, trend: performanceCycleMembers.trend })
     .from(performanceCycleMembers)
     .innerJoin(users, eq(performanceCycleMembers.userId, users.id))
     .where(eq(performanceCycleMembers.cycleId, row.id))
@@ -635,7 +637,7 @@ async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSel
     id: row.id,
     title: row.title,
     cycleMonth: row.cycleMonth,
-    users: memberRows.map((r) => ({ ...mapUserFromDb(r.user), rating: r.rating })),
+    users: memberRows.map((r) => ({ ...mapUserFromDb(r.user), rating: r.rating, trend: r.trend })),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -1788,6 +1790,15 @@ export const resolvers = {
       if (!cycle) throw new Error("Performance cycle not found");
       await db.update(performanceCycleMembers)
         .set({ rating })
+        .where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)));
+      return true;
+    },
+    setPerformanceCycleMemberTrend: async (_: unknown, { cycleId, userId, trend }: { cycleId: number; userId: number; trend: string | null }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const [cycle] = await db.select().from(performanceCycles).where(and(eq(performanceCycles.id, cycleId), eq(performanceCycles.ownerId, ownerId)));
+      if (!cycle) throw new Error("Performance cycle not found");
+      await db.update(performanceCycleMembers)
+        .set({ trend })
         .where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)));
       return true;
     },

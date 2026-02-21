@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import {
@@ -51,6 +51,7 @@ interface CycleUser {
   fullName: string;
   jobLevel: string;
   rating: string | null;
+  trend: string | null;
 }
 
 const RATINGS: { value: string | null; label: string; dotClass: string; textClass: string }[] = [
@@ -62,6 +63,17 @@ const RATINGS: { value: string | null; label: string; dotClass: string; textClas
   { value: "DidNotMeetExpectations", label: "Did Not Meet Expectations",dotClass: "bg-red-500",     textClass: "text-red-600" },
   { value: "NotEligible",            label: "Not Eligible",             dotClass: "bg-gray-400",    textClass: "text-gray-500" },
 ];
+
+const TRENDS: { value: string | null; label: string; colorClass: string }[] = [
+  { value: null, label: "—", colorClass: "text-gray-400" },
+  { value: "+",  label: "+", colorClass: "text-green-600" },
+  { value: "=",  label: "=", colorClass: "text-blue-600" },
+  { value: "-",  label: "−", colorClass: "text-red-600" },
+];
+
+const TREND_EMPTY_KEY = "__empty__";
+function trendToKey(t: string | null) { return t ?? TREND_EMPTY_KEY; }
+function keyToTrend(k: string): string | null { return k === TREND_EMPTY_KEY ? null : k; }
 
 const UNRATED_KEY = "__unrated__";
 function ratingToKey(r: string | null) { return r ?? UNRATED_KEY; }
@@ -79,6 +91,7 @@ const GET_PERFORMANCE_CYCLE = gql`
         fullName
         jobLevel
         rating
+        trend
       }
       createdAt
     }
@@ -94,6 +107,12 @@ const DELETE_PERFORMANCE_CYCLE = gql`
 const REORDER_PERFORMANCE_CYCLE_USERS = gql`
   mutation ReorderPerformanceCycleUsers($cycleId: Int!, $userIds: [Int!]!) {
     reorderPerformanceCycleUsers(cycleId: $cycleId, userIds: $userIds)
+  }
+`;
+
+const SET_TREND = gql`
+  mutation SetPerformanceCycleMemberTrend($cycleId: Int!, $userId: Int!, $trend: String) {
+    setPerformanceCycleMemberTrend(cycleId: $cycleId, userId: $userId, trend: $trend)
   }
 `;
 
@@ -156,11 +175,8 @@ function RatingSelect({
   const cfg = ratingConfig(value);
   return (
     <Select value={ratingToKey(value)} onValueChange={(k) => onChange(keyToRating(k))}>
-      <SelectTrigger className="w-52 gap-2">
-        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${cfg.dotClass}`} />
-        <span className={`truncate ${cfg.textClass}`}>
-          <SelectValue />
-        </span>
+      <SelectTrigger className="w-52">
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {RATINGS.map((r) => (
@@ -176,14 +192,42 @@ function RatingSelect({
   );
 }
 
+function TrendSelect({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (trend: string | null) => void;
+}) {
+  const cfg = TRENDS.find((t) => t.value === value) ?? TRENDS[0];
+  return (
+    <Select value={trendToKey(value)} onValueChange={(k) => onChange(keyToTrend(k))}>
+      <SelectTrigger className="w-16">
+        <span className={`font-semibold ${cfg.colorClass}`}>
+          <SelectValue placeholder="—" />
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {TRENDS.map((t) => (
+          <SelectItem key={trendToKey(t.value)} value={trendToKey(t.value)}>
+            <span className={`font-semibold ${t.colorClass}`}>{t.label}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function SortableUserRow({
   user,
   cycleId,
   onRatingChange,
+  onTrendChange,
 }: {
   user: CycleUser;
   cycleId: number;
   onRatingChange: (userId: number, rating: string | null) => void;
+  onTrendChange: (userId: number, trend: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: user.id });
@@ -213,10 +257,16 @@ function SortableUserRow({
       </TableCell>
       <TableCell>{user.jobLevel}</TableCell>
       <TableCell>
-        <RatingSelect
-          value={user.rating}
-          onChange={(rating) => onRatingChange(user.id, rating)}
-        />
+        <div className="flex items-center gap-2">
+          <RatingSelect
+            value={user.rating}
+            onChange={(rating) => onRatingChange(user.id, rating)}
+          />
+          <TrendSelect
+            value={user.trend}
+            onChange={(trend) => onTrendChange(user.id, trend)}
+          />
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -231,6 +281,13 @@ export default function PerformanceCycleDetail() {
   });
   const [users, setUsers] = useState<CycleUser[]>([]);
   const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showSaved() {
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    setSaved(true);
+    savedTimer.current = setTimeout(() => setSaved(false), 2000);
+  }
 
   useEffect(() => {
     if (data?.performanceCycle) setUsers(data.performanceCycle.users);
@@ -254,6 +311,29 @@ export default function PerformanceCycleDetail() {
         query: GET_PERFORMANCE_CYCLE,
         variables: { id: cid },
         data: { performanceCycle: { ...existing.performanceCycle, users: reordered } },
+      });
+    },
+  });
+
+  const [setTrend] = useMutation(SET_TREND, {
+    update(cache, _, { variables }) {
+      const { cycleId: cid, userId, trend } = variables as { cycleId: number; userId: number; trend: string | null };
+      const existing = cache.readQuery<{ performanceCycle: { users: CycleUser[] } & Record<string, unknown> }>({
+        query: GET_PERFORMANCE_CYCLE,
+        variables: { id: cid },
+      });
+      if (!existing?.performanceCycle) return;
+      cache.writeQuery({
+        query: GET_PERFORMANCE_CYCLE,
+        variables: { id: cid },
+        data: {
+          performanceCycle: {
+            ...existing.performanceCycle,
+            users: existing.performanceCycle.users.map((u) =>
+              u.id === userId ? { ...u, trend } : u
+            ),
+          },
+        },
       });
     },
   });
@@ -290,15 +370,17 @@ export default function PerformanceCycleDetail() {
     const newIndex = users.findIndex((u) => u.id === over.id);
     const newOrder = arrayMove(users, oldIndex, newIndex);
     setUsers(newOrder);
-    reorderUsers({ variables: { cycleId, userIds: newOrder.map((u) => u.id) } }).then(() => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    });
+    reorderUsers({ variables: { cycleId, userIds: newOrder.map((u) => u.id) } }).then(showSaved);
   }
 
   function handleRatingChange(userId: number, rating: string | null) {
     setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, rating } : u)));
-    setRating({ variables: { cycleId, userId, rating } });
+    setRating({ variables: { cycleId, userId, rating } }).then(showSaved);
+  }
+
+  function handleTrendChange(userId: number, trend: string | null) {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, trend } : u)));
+    setTrend({ variables: { cycleId, userId, trend } }).then(showSaved);
   }
 
   if (loading) return <p>Loading...</p>;
@@ -382,6 +464,7 @@ export default function PerformanceCycleDetail() {
                   user={user}
                   cycleId={cycleId}
                   onRatingChange={handleRatingChange}
+                  onTrendChange={handleTrendChange}
                 />
               ))}
             </TableBody>
