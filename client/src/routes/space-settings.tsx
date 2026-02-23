@@ -110,7 +110,9 @@ export default function SpaceSettings() {
 
   // Job level limits
   const { data: jobLevelData } = useQuery(JOB_LEVEL_LIMITS, { skip: !isOwner });
-  const [setJobLevelLimit] = useMutation(SET_JOB_LEVEL_LIMIT);
+  const [setJobLevelLimit] = useMutation(SET_JOB_LEVEL_LIMIT, {
+    refetchQueries: ["JobLevelLimits"],
+  });
   const defaultLimits = [
     { jobLevel: "Junior", limitMonths: 0 },
     { jobLevel: "Mid", limitMonths: 0 },

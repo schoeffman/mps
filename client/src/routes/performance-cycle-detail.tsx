@@ -143,7 +143,7 @@ const USER_PERFORMANCE_CYCLES = gql`
 `;
 
 const JOB_LEVEL_LIMITS = gql`
-  query JobLevelLimitsCycleDetail {
+  query JobLevelLimits {
     jobLevelLimits {
       jobLevel
       limitMonths

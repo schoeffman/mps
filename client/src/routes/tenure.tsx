@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 
 const JOB_LEVEL_LIMITS = gql`
-  query JobLevelLimitsPerf {
+  query JobLevelLimits {
     jobLevelLimits {
       jobLevel
       limitMonths
