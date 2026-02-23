@@ -1,10 +1,11 @@
 import { useState, useMemo, createContext, useContext } from "react";
 import { useQuery, useMutation, gql } from "@apollo/client";
 import { Link } from "react-router-dom";
+import { format } from "date-fns";
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import {
   Select,
   SelectContent,
@@ -234,13 +235,12 @@ export default function WorkHistory() {
 }
 
 function AddWorkHistoryForm({ defaultDate }: { defaultDate?: string }) {
-  const yesterday = toISO(new Date(Date.now() - 86400000));
-  const initial = defaultDate && defaultDate <= yesterday ? defaultDate : yesterday;
+  const yesterday = new Date(Date.now() - 86400000);
+  const initialDate = defaultDate && defaultDate <= toISO(yesterday) ? new Date(defaultDate + "T00:00:00") : yesterday;
 
   const [addUserId, setAddUserId] = useState<string>("");
   const [addProjectId, setAddProjectId] = useState<string>("");
-  const [addStartDate, setAddStartDate] = useState(initial);
-  const [addEndDate, setAddEndDate] = useState(initial);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: initialDate, to: initialDate });
 
   const { data: usersData } = useQuery(GET_USERS);
   const { data: projectsData } = useQuery(GET_PROJECTS);
@@ -253,72 +253,63 @@ function AddWorkHistoryForm({ defaultDate }: { defaultDate?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!addUserId || !addProjectId || !addStartDate || !addEndDate) return;
+    if (!addUserId || !addProjectId || !dateRange?.from || !dateRange?.to) return;
     await addEntries({
-      variables: { userId: Number(addUserId), projectId: Number(addProjectId), startDate: addStartDate, endDate: addEndDate },
+      variables: {
+        userId: Number(addUserId),
+        projectId: Number(addProjectId),
+        startDate: format(dateRange.from, "yyyy-MM-dd"),
+        endDate: format(dateRange.to, "yyyy-MM-dd"),
+      },
     });
     setAddUserId("");
     setAddProjectId("");
-    setAddStartDate(initial);
-    setAddEndDate(initial);
+    setDateRange({ from: initialDate, to: initialDate });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-3 flex-wrap">
-      <div className="grid gap-1.5">
-        <label className="text-sm font-medium">User</label>
-        <Select value={addUserId} onValueChange={setAddUserId}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select user" />
-          </SelectTrigger>
-          <SelectContent>
-            {allUsers.map((u) => (
-              <SelectItem key={u.id} value={String(u.id)}>
-                {u.fullName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="grid gap-1.5">
+          <label className="text-sm font-medium">User</label>
+          <Select value={addUserId} onValueChange={setAddUserId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select user" />
+            </SelectTrigger>
+            <SelectContent>
+              {allUsers.map((u) => (
+                <SelectItem key={u.id} value={String(u.id)}>
+                  {u.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <label className="text-sm font-medium">Project</label>
+          <Select value={addProjectId} onValueChange={setAddProjectId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              {allProjects.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="grid gap-1.5">
-        <label className="text-sm font-medium">Project</label>
-        <Select value={addProjectId} onValueChange={setAddProjectId}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select project" />
-          </SelectTrigger>
-          <SelectContent>
-            {allProjects.map((p) => (
-              <SelectItem key={p.id} value={String(p.id)}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid gap-1.5">
-        <label className="text-sm font-medium">Start Date</label>
-        <Input
-          type="date"
-          value={addStartDate}
-          onChange={(e) => setAddStartDate(e.target.value)}
-          max={addEndDate}
-          className="w-[160px]"
-          required
+        <label className="text-sm font-medium">Date Range</label>
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          disabledDays={{ after: yesterday }}
         />
       </div>
-      <div className="grid gap-1.5">
-        <label className="text-sm font-medium">End Date</label>
-        <Input
-          type="date"
-          value={addEndDate}
-          onChange={(e) => setAddEndDate(e.target.value)}
-          min={addStartDate}
-          max={yesterday}
-          className="w-[160px]"
-          required
-        />
-      </div>
-      <Button type="submit" variant="outline" disabled={adding || !addUserId || !addProjectId || !addStartDate || !addEndDate}>
+      <Button type="submit" variant="outline" disabled={adding || !addUserId || !addProjectId || !dateRange?.from || !dateRange?.to}>
         {adding ? "Adding..." : "Add Entries"}
       </Button>
     </form>

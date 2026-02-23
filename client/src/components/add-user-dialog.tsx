@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useMutation, gql } from "@apollo/client";
+import { format } from "date-fns";
 import { GET_USERS } from "@/routes/users";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -116,12 +118,10 @@ export function AddUserDialog() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="levelStartDate">Time at Level Start Date</Label>
-            <Input
-              id="levelStartDate"
-              type="date"
-              value={levelStartDate}
-              onChange={(e) => setLevelStartDate(e.target.value)}
+            <Label>Time at Level Start Date</Label>
+            <DatePicker
+              value={levelStartDate ? new Date(levelStartDate) : undefined}
+              onChange={(date) => setLevelStartDate(date ? format(date, "yyyy-MM-dd") : "")}
             />
           </div>
 

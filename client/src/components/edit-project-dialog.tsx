@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, gql } from "@apollo/client";
+import { parseISO, format } from "date-fns";
 import { Pencil } from "lucide-react";
 import { GET_PROJECTS } from "@/routes/projects";
 import { GET_USERS } from "@/routes/users";
 import { PROJECT_COLOR_OPTIONS } from "@/lib/project-colors";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -138,13 +140,10 @@ export function EditProjectDialog({ project, trigger }: EditProjectDialogProps) 
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="edit-targetDate">Target Date</Label>
-            <Input
-              id="edit-targetDate"
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              required
+            <Label>Target Date</Label>
+            <DatePicker
+              value={targetDate ? parseISO(targetDate) : undefined}
+              onChange={(date) => setTargetDate(date ? format(date, "yyyy-MM-dd") : "")}
             />
           </div>
 

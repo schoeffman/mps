@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, gql } from "@apollo/client";
+import { parseISO, format } from "date-fns";
 import { Pencil } from "lucide-react";
 import { GET_USERS } from "@/routes/users";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -137,12 +139,10 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="edit-levelStartDate">Time at Level Start Date</Label>
-            <Input
-              id="edit-levelStartDate"
-              type="date"
-              value={levelStartDate}
-              onChange={(e) => setLevelStartDate(e.target.value)}
+            <Label>Time at Level Start Date</Label>
+            <DatePicker
+              value={levelStartDate ? parseISO(levelStartDate) : undefined}
+              onChange={(date) => setLevelStartDate(date ? format(date, "yyyy-MM-dd") : "")}
             />
           </div>
 
