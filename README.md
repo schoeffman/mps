@@ -143,21 +143,6 @@ You can optionally connect a Jira Cloud instance to view issues on project pages
    - Edit any project and enter its **Jira Project Key** (e.g. `MPS`, `INFRA`)
    - The project detail page will display a **Jira Issues** table with links back to Jira
 
-### Schema migration
-
-If upgrading an existing database, run:
-
-```sql
-CREATE TABLE jira_config (
-  id SERIAL PRIMARY KEY,
-  owner_id TEXT NOT NULL UNIQUE REFERENCES "user"(id),
-  domain TEXT NOT NULL,
-  email TEXT NOT NULL,
-  api_token TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW() NOT NULL
-);
-ALTER TABLE projects ADD COLUMN jira_project_key TEXT;
-```
 
 ## Tech stack
 
