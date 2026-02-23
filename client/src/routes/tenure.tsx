@@ -57,6 +57,22 @@ export default function Tenure() {
       };
     });
 
+  const untracked = users.filter((u) => !limitMap.has(u.jobLevel));
+  const untrackedGroups = levelOrder
+    .filter((level) => untracked.some((u) => u.jobLevel === level))
+    .map((level) => ({
+      level,
+      users: untracked.filter((u) => u.jobLevel === level).sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    }));
+  // Also include any job levels not in levelOrder
+  const extraLevels = [...new Set(untracked.map((u) => u.jobLevel))].filter((l) => !levelOrder.includes(l)).sort();
+  for (const level of extraLevels) {
+    untrackedGroups.push({
+      level,
+      users: untracked.filter((u) => u.jobLevel === level).sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    });
+  }
+
   return (
     <>
       <h1 className="text-2xl font-semibold mb-6">Tenure</h1>
@@ -145,6 +161,46 @@ export default function Tenure() {
               </div>
             );
           })}
+          {untrackedGroups.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-1">No Limit Configured</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                These job levels have no time in level limit set.{" "}
+                <Link to="/space-settings" className="underline">Configure limits</Link>.
+              </p>
+              <div className="flex flex-col gap-6">
+                {untrackedGroups.map(({ level, users: groupUsers }) => (
+                  <div key={level}>
+                    <h3 className="text-base font-semibold mb-2">{level}</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Level Since</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {groupUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              <Link to={`/users/${user.id}`} className="hover:underline">
+                                {user.fullName}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              {user.levelStartDate
+                                ? new Date(user.levelStartDate).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" })
+                                : <span className="text-muted-foreground">Not set</span>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
