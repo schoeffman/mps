@@ -656,7 +656,7 @@ export const resolvers = {
     hello: () => "Hello world from Apollo Server!",
     users: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
-      const rows = await db.select().from(users).where(eq(users.ownerId, ownerId));
+      const rows = await db.select().from(users).where(eq(users.ownerId, ownerId)).orderBy(asc(users.fullName));
       return rows.map(mapUserFromDb);
     },
     user: async (_: unknown, { id }: { id: number }, context: Context) => {

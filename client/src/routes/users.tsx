@@ -11,7 +11,6 @@ export const GET_USERS = gql`
       jobLevel
       levelStartDate
       craftFocus
-      createdAt
     }
   }
 `;
