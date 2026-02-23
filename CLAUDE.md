@@ -114,34 +114,6 @@ APPLE_CLIENT_SECRET=
 DATABASE_URL=postgresql://localhost:5432/mps  # optional, defaults to this
 ```
 
-## Database Migrations
-
-Migration files live in `server/drizzle/`. Always commit them alongside schema changes.
-
-**Making a schema change:**
-```bash
-# 1. Edit server/src/db/schema.ts
-# 2. Generate the migration file
-npm run db:generate -w server
-# 3. Apply it locally
-npm run db:migrate -w server
-# 4. Commit both the schema change and the new file in server/drizzle/
-```
-
-**Applying migrations in production (Railway):**
-```bash
-DATABASE_URL=<railway-url> npm run db:migrate -w server
-```
-
-**First-time setup on an existing database** (run once — marks the baseline as already applied without re-running it):
-```bash
-# Local
-npm run db:mark-baseline -w server
-# Railway
-DATABASE_URL=<railway-url> npm run db:mark-baseline -w server
-```
-
-> Do not use `db:push` for production — it syncs the schema directly with no migration file and no history.
 
 ## Production (Railway)
 
