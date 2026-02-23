@@ -578,6 +578,7 @@ const SYSTEM_PROJECTS = [
   { name: "Leave (Standard)", projectType: "Other", color: "cyan" },
   { name: "Leave (Extended)", projectType: "Other", color: "purple" },
   { name: "Other", projectType: "Other", color: "teal" },
+  { name: "RTB: General", projectType: "Maintenance", color: "green" },
 ];
 
 async function ensureSystemProjects(ownerId: string) {
