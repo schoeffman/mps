@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { FolderKanban } from "lucide-react";
 
 interface Project {
   id: number;
@@ -101,7 +101,7 @@ export function RowProjectPicker({
           className="shrink-0 ml-1.5 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
           title="Assign project to all weeks"
         >
-          <ChevronRight className="size-3.5" />
+          <FolderKanban className="size-3.5" />
         </button>
       </div>
       {open &&
