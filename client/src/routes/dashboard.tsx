@@ -38,6 +38,13 @@ const GET_DASHBOARD_DATA = gql`
       assignees
       targetDate
     }
+    unscheduledProjects(weekStart: $weekStart) {
+      projectId
+      projectName
+      color
+      status
+      targetDate
+    }
   }
 `;
 
@@ -112,6 +119,7 @@ export default function Dashboard() {
   });
 
   const scheduledProjects: ScheduledProject[] = data?.scheduledProjects ?? [];
+  const unscheduledProjects: ScheduledProject[] = data?.unscheduledProjects ?? [];
   const projectIds = scheduledProjects.map((p) => p.projectId);
 
   const { data: atlassianData } = useQuery(GET_ATLASSIAN_STATUSES, {
@@ -333,6 +341,37 @@ export default function Dashboard() {
                       </li>
                     );
                   })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Projects Not Scheduled This Week</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {unscheduledProjects.length === 0 ? (
+                <p className="text-muted-foreground text-sm">All active projects are scheduled this week.</p>
+              ) : (
+                <ul className="-mx-6">
+                  {unscheduledProjects.map((p, i) => (
+                    <li key={p.projectId} className={`px-6 py-2 flex items-center justify-between gap-4 text-sm ${i % 2 === 1 ? "bg-muted/50" : ""}`}>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block size-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        <Link to={`/projects/${p.projectId}`} className="font-medium hover:underline">{p.projectName}</Link>
+                        <Badge variant="outline" className="text-xs">{p.status}</Badge>
+                      </div>
+                      {p.targetDate && (
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          Due {new Date(p.targetDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               )}
             </CardContent>

@@ -1,5 +1,5 @@
 import gql from "graphql-tag";
-import { eq, inArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
+import { eq, inArray, notInArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions, performanceCycles, performanceCycleMembers } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
@@ -368,6 +368,7 @@ export const typeDefs = gql`
     leaveAssignments(startDate: String!, endDate: String!): [LeaveAssignment!]!
     onCallAssignments(startDate: String!, endDate: String!): [OnCallAssignment!]!
     scheduledProjects(weekStart: String!): [ScheduledProject!]!
+    unscheduledProjects(weekStart: String!): [ScheduledProject!]!
     projectAtlassianStatuses(projectIds: [Int!]!): [ProjectAtlassianStatus!]!
     performanceCycles: [PerformanceCycle!]!
     performanceCycle(id: Int!): PerformanceCycle
@@ -1195,6 +1196,52 @@ export const resolvers = {
         projectId,
         ...data,
       }));
+    },
+    unscheduledProjects: async (_: unknown, { weekStart }: { weekStart: string }, context: Context) => {
+      const ownerId = getOwnerId(context);
+
+      // Get project IDs that have assignments this week across all owner schedules
+      const ownerSchedules = await db
+        .select({ id: schedules.id })
+        .from(schedules)
+        .where(eq(schedules.ownerId, ownerId));
+      const scheduleIds = ownerSchedules.map((s) => s.id);
+
+      const scheduledIds = scheduleIds.length > 0
+        ? (await db
+            .selectDistinct({ projectId: scheduleAssignments.projectId })
+            .from(scheduleAssignments)
+            .where(
+              and(
+                inArray(scheduleAssignments.scheduleId, scheduleIds),
+                eq(scheduleAssignments.weekStart, weekStart),
+              ),
+            )).map((r) => r.projectId)
+        : [];
+
+      // Get all active non-system projects not scheduled this week
+      const excludedStatuses = ["Complete", "Cancelled", "Paused"];
+      const query = db
+        .select({
+          projectId: projects.id,
+          projectName: projects.name,
+          color: projects.color,
+          status: projects.status,
+          targetDate: projects.targetDate,
+        })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.ownerId, ownerId),
+            eq(projects.isSystem, false),
+            notInArray(projects.status, excludedStatuses),
+            ...(scheduledIds.length > 0 ? [notInArray(projects.id, scheduledIds)] : []),
+          ),
+        )
+        .orderBy(asc(projects.name));
+
+      const rows = await query;
+      return rows.map((r) => ({ ...r, assignees: [] }));
     },
     projectAtlassianStatuses: async (_: unknown, { projectIds }: { projectIds: number[] }, context: Context) => {
       const ownerId = getOwnerId(context);
