@@ -218,7 +218,7 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
-  status: text("status").notNull().default("Backlog"),
+  status: text("status").notNull().default("New"),
   ownerId: text("owner_id").notNull().references(() => authUser.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

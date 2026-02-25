@@ -1,5 +1,5 @@
 import gql from "graphql-tag";
-import { eq, inArray, notInArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
+import { eq, inArray, notInArray, gte, lte, gt, lt, and, or, desc, asc, sql } from "drizzle-orm";
 import { db } from "./db/index.js";
 import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions, performanceCycles, performanceCycleMembers, tasks } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
@@ -374,6 +374,12 @@ export const typeDefs = gql`
     performanceCycle(id: Int!): PerformanceCycle
     userPerformanceCycles(userId: Int!): [UserCycleHistory!]!
     tasks: [Task!]!
+    completedTasks(page: Int): CompletedTasksPage!
+  }
+
+  type CompletedTasksPage {
+    tasks: [Task!]!
+    total: Int!
   }
 
   type Task {
@@ -473,6 +479,7 @@ export const typeDefs = gql`
     setPerformanceCycleMemberTrend(cycleId: Int!, userId: Int!, trend: String): Boolean!
     createTask(input: CreateTaskInput!): Task!
     updateTaskStatus(id: Int!, status: String!): Task!
+    deleteTask(id: Int!): Boolean!
   }
 `;
 
@@ -1321,8 +1328,19 @@ export const resolvers = {
       return db
         .select()
         .from(tasks)
-        .where(eq(tasks.ownerId, ownerId))
+        .where(and(eq(tasks.ownerId, ownerId), notInArray(tasks.status, ["Complete"])))
         .orderBy(desc(tasks.createdAt));
+    },
+    completedTasks: async (_: unknown, { page = 1 }: { page?: number }, context: Context) => {
+      const ownerId = getOwnerId(context);
+      const limit = 20;
+      const offset = (page - 1) * limit;
+      const where = and(eq(tasks.ownerId, ownerId), eq(tasks.status, "Complete"));
+      const [rows, [{ count }]] = await Promise.all([
+        db.select().from(tasks).where(where).orderBy(desc(tasks.createdAt)).limit(limit).offset(offset),
+        db.select({ count: sql<number>`count(*)::int` }).from(tasks).where(where),
+      ]);
+      return { tasks: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })), total: count };
     },
   },
   Mutation: {
@@ -1988,6 +2006,12 @@ export const resolvers = {
         .returning();
       if (!row) throw new Error("Task not found");
       return row;
+    },
+    deleteTask: async (_: unknown, { id }: { id: number }, context: Context) => {
+      requireAuth(context);
+      const ownerId = getOwnerId(context);
+      const deleted = await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.ownerId, ownerId))).returning();
+      return deleted.length > 0;
     },
   },
 };

@@ -22,6 +22,7 @@ import SpaceSettings from "./routes/space-settings";
 import WorkHistory from "./routes/work-history";
 import Dashboard from "./routes/dashboard";
 import Tasks from "./routes/tasks";
+import CompletedTasks from "./routes/completed-tasks";
 import "./index.css";
 
 const router = createBrowserRouter([
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
           { path: "tasks", element: <Tasks /> },
+          { path: "tasks/completed", element: <CompletedTasks /> },
           { path: "users", element: <Users /> },
           { path: "users/tenure", element: <Tenure /> },
           { path: "users/performance-cycles", element: <PerformanceCycles /> },
