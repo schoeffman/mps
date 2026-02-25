@@ -1,5 +1,5 @@
 import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
-import { Moon, Sun, LayoutDashboard, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut, SlidersHorizontal, ChevronRight } from "lucide-react";
+import { Moon, Sun, LayoutDashboard, ListTodo, Users, UsersRound, FolderKanban, CalendarDays, ClipboardList, LogOut, SlidersHorizontal, ChevronRight } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSession, signOut } from "@/lib/auth-client";
 import { apolloClient, setActiveSpaceId } from "@/lib/apollo-client";
@@ -54,6 +54,14 @@ export function AppSidebar() {
                   <NavLink to="/" end>
                     <LayoutDashboard className="size-4" />
                     Dashboard
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname.startsWith("/tasks")}>
+                  <NavLink to="/tasks">
+                    <ListTodo className="size-4" />
+                    Tasks
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

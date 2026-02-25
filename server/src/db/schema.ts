@@ -213,3 +213,12 @@ export const performanceCycleMembers = pgTable("performance_cycle_members", {
   rating: text("rating"),
   trend: text("trend"),
 });
+
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("Backlog"),
+  ownerId: text("owner_id").notNull().references(() => authUser.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

@@ -1,7 +1,7 @@
 import gql from "graphql-tag";
 import { eq, inArray, notInArray, gte, lte, gt, lt, and, or, desc, asc } from "drizzle-orm";
 import { db } from "./db/index.js";
-import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions, performanceCycles, performanceCycleMembers } from "./db/schema.js";
+import { users, teams, teamMembers, projects, projectMembers, projectLinks, schedules, scheduleAssignments, workHistory, session, account, verification, authUser, spaceMembers, jiraConfig, jobLevelLimits, projectChecklistCompletions, performanceCycles, performanceCycleMembers, tasks } from "./db/schema.js";
 import { mergeWeekRanges } from "./lib/merge-week-ranges.js";
 import { generateDateRange } from "./lib/generate-date-range.js";
 import { fetchJiraIssues, fetchJiraTransitions, transitionJiraIssue, searchJiraUsers, assignJiraIssue } from "./lib/jira-client.js";
@@ -373,6 +373,20 @@ export const typeDefs = gql`
     performanceCycles: [PerformanceCycle!]!
     performanceCycle(id: Int!): PerformanceCycle
     userPerformanceCycles(userId: Int!): [UserCycleHistory!]!
+    tasks: [Task!]!
+  }
+
+  type Task {
+    id: Int!
+    title: String!
+    description: String!
+    status: String!
+    createdAt: String!
+  }
+
+  input CreateTaskInput {
+    title: String!
+    description: String
   }
 
   type UserCycleHistory {
@@ -457,6 +471,8 @@ export const typeDefs = gql`
     reorderPerformanceCycleUsers(cycleId: Int!, userIds: [Int!]!): Boolean!
     setPerformanceCycleMemberRating(cycleId: Int!, userId: Int!, rating: String): Boolean!
     setPerformanceCycleMemberTrend(cycleId: Int!, userId: Int!, trend: String): Boolean!
+    createTask(input: CreateTaskInput!): Task!
+    updateTaskStatus(id: Int!, status: String!): Task!
   }
 `;
 
@@ -1300,6 +1316,14 @@ export const resolvers = {
         .orderBy(asc(performanceCycles.cycleMonth));
       return rows;
     },
+    tasks: async (_: unknown, __: unknown, context: Context) => {
+      const ownerId = getOwnerId(context);
+      return db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.ownerId, ownerId))
+        .orderBy(desc(tasks.createdAt));
+    },
   },
   Mutation: {
     createUser: async (
@@ -1944,6 +1968,26 @@ export const resolvers = {
         .set({ trend })
         .where(and(eq(performanceCycleMembers.cycleId, cycleId), eq(performanceCycleMembers.userId, userId)));
       return true;
+    },
+    createTask: async (_: unknown, { input }: { input: { title: string; description?: string } }, context: Context) => {
+      requireAuth(context);
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .insert(tasks)
+        .values({ title: input.title, description: input.description ?? "", ownerId })
+        .returning();
+      return row;
+    },
+    updateTaskStatus: async (_: unknown, { id, status }: { id: number; status: string }, context: Context) => {
+      requireAuth(context);
+      const ownerId = getOwnerId(context);
+      const [row] = await db
+        .update(tasks)
+        .set({ status })
+        .where(and(eq(tasks.id, id), eq(tasks.ownerId, ownerId)))
+        .returning();
+      if (!row) throw new Error("Task not found");
+      return row;
     },
   },
 };
