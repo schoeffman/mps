@@ -70,6 +70,28 @@ app.use(
   }),
 );
 
+// Mobile OAuth start — browser-side initiation so Better Auth's state cookie
+// lands in the correct cookie jar (ASWebAuthenticationSession's ephemeral store)
+app.get("/auth/mobile-start", (_req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+(async () => {
+  try {
+    const r = await fetch('/api/auth/sign-in/social', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'google', callbackURL: 'https://mps-p.up.railway.app/auth/mobile-callback' })
+    });
+    const d = await r.json();
+    if (d.url) { window.location.href = d.url; }
+    else { window.location.href = 'mps-ios://auth/callback?error=no_url'; }
+  } catch (e) {
+    window.location.href = 'mps-ios://auth/callback?error=init_failed';
+  }
+})();
+</script></body></html>`);
+});
+
 // Mobile OAuth relay — fetches the Better Auth session and deep-links into iOS app
 app.get("/auth/mobile-callback", async (req, res) => {
   // Primary: use Better Auth's getSession (reads the session cookie)
