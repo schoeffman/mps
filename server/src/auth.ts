@@ -29,5 +29,6 @@ export const auth = betterAuth({
       .split(",")
       .map((o) => o.trim()),
     process.env.BETTER_AUTH_URL || "http://localhost:4000",
+    "https://mps-p.up.railway.app",
   ],
 });

@@ -72,6 +72,7 @@ app.use(
 
 // Mobile OAuth relay — fetches the Better Auth session and deep-links into iOS app
 app.get("/auth/mobile-callback", async (req, res) => {
+  // Primary: use Better Auth's getSession (reads the session cookie)
   try {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
@@ -82,8 +83,27 @@ app.get("/auth/mobile-callback", async (req, res) => {
       return;
     }
   } catch (err) {
-    console.error("mobile-callback session error:", err);
+    console.error("mobile-callback getSession error:", err);
   }
+
+  // Fallback: read the raw Better Auth session cookie directly
+  const cookieStr = req.headers.cookie ?? "";
+  const cookies = Object.fromEntries(
+    cookieStr.split(";").flatMap((pair) => {
+      const idx = pair.indexOf("=");
+      if (idx === -1) return [];
+      const key = pair.slice(0, idx).trim();
+      const val = pair.slice(idx + 1).trim();
+      return key ? [[key, decodeURIComponent(val)]] : [];
+    }),
+  );
+  const rawToken = cookies["better-auth.session_token"];
+  if (rawToken) {
+    res.redirect(`mps-ios://auth/callback?token=${encodeURIComponent(rawToken)}`);
+    return;
+  }
+
+  console.warn("mobile-callback: no session found, cookies:", Object.keys(cookies));
   res.redirect("mps-ios://auth/callback?error=no_session");
 });
 
