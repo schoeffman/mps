@@ -1,6 +1,6 @@
 # MPS
 
-MPS (Project Scheduler) is a web app for managing team capacity across quarterly schedules. It shows who is working on what each week in an interactive grid view and keeps a daily work history audit trail.
+MPS (Project Scheduler) is a web app for managing team capacity, tracking projects, and planning work across quarterly schedules.
 
 ## Prerequisites
 
@@ -38,10 +38,17 @@ MPS (Project Scheduler) is a web app for managing team capacity across quarterly
    | `CORS_ORIGIN` | Allowed client origin (default: `http://localhost:5173`) |
    | `TRUSTED_ORIGINS` | Comma-separated trusted origins for auth (default: `http://localhost:5173`) |
 
-3. **Push the database schema:**
+3. **Apply the database schema:**
 
    ```
-   npm run db:push -w server
+   npm run db:migrate -w server
+   ```
+
+   If you're connecting to a database that already has the schema applied (before migrations were tracked), run this first:
+
+   ```
+   npm run db:mark-baseline -w server
+   npm run db:migrate -w server
    ```
 
 4. **Start the development servers:**
@@ -87,7 +94,9 @@ From the project root:
 | `npm run dev -w server` | Start only the API server |
 | `npm run build` | Build the client for production |
 | `npm start` | Start the production server (serves built client) |
-| `npm run db:push -w server` | Push schema changes to the database |
+| `npm run db:generate -w server` | Generate a migration file from schema changes |
+| `npm run db:migrate -w server` | Apply pending migrations to the database |
+| `npm run db:mark-baseline -w server` | Mark the baseline migration as applied on an existing database (run once) |
 | `npm run db:seed -w server` | Seed the database (requires `OWNER_ID` env var) |
 | `npm run db:reseed -w server` | Clear and reseed using the first auth user in the database |
 | `npm run db:studio -w server` | Open Drizzle Studio to browse the database |
@@ -114,12 +123,16 @@ No database or network connection is required to run tests.
 
 ## Features
 
-- **Dashboard** — landing page showing on-call assignments (this week and next), leave/vacation overview (with US holidays), and projects scheduled this week with Atlassian project status
+- **Dashboard** — at-a-glance overview of on-call assignments, leave and vacation, US holidays, projects scheduled this week (with Atlassian status), and projects not yet scheduled
 - **Users** — manage people with craft ability, job level, and focus area
+- **Tenure** — view how long each user has been at their current job level, with configurable time-in-level limits per level
 - **Teams** — group users with a team lead
-- **Projects** — track projects with DRI, status, target date, and color coding
+- **Projects** — track projects with DRI, status, target date, type, and color coding
 - **Schedules** — quarterly schedule grids showing weekly user/project assignments with column and row bulk assignment, paint mode, and auto-scroll to the current week
 - **Work History** — daily snapshots of schedule assignments with a date picker for browsing past records (cron job runs at 11 PM daily)
+- **Tasks** — personal kanban board (New, Next Up, Deferred) with a drag-and-drop priority pyramid, completed tasks history, and a medal system that tracks gold/silver/bronze completions based on pyramid position
+- **Performance Cycles** — track performance review cycles and member ratings across review periods
+- **Space Sharing** — share your data with other users; switch between spaces via the header dropdown
 - **Jira Integration** — link projects to Jira Cloud to view issues (key, summary, status, assignee) directly on the project detail page
 - **Atlassian Projects Integration** — link projects to Atlassian Projects to view status, latest update, and due date on the dashboard and project detail page
 - **Auth** — Google (and Apple) social login via Better Auth with per-user data isolation
