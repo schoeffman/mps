@@ -338,7 +338,6 @@ export const typeDefs = gql`
   }
 
   type Query {
-    hello: String
     users: [User!]!
     user(id: Int!): User
     teams: [Team!]!
@@ -457,7 +456,6 @@ export const typeDefs = gql`
     deleteWorkHistoryEntry(id: Int!): Boolean!
     addProjectLink(projectId: Int!, url: String!): ProjectLink!
     removeProjectLink(id: Int!): Boolean!
-    linkAuthUser(appUserId: Int!): Boolean!
     addSpaceMember(email: String!): SpaceMember!
     removeSpaceMember(memberAuthId: String!): Boolean!
     leaveSpace(ownerAuthId: String!): Boolean!
@@ -678,7 +676,6 @@ async function mapPerformanceCycleFromDb(row: typeof performanceCycles.$inferSel
 
 export const resolvers = {
   Query: {
-    hello: () => "Hello world from Apollo Server!",
     users: async (_: unknown, __: unknown, context: Context) => {
       const ownerId = getOwnerId(context);
       const rows = await db.select().from(users).where(eq(users.ownerId, ownerId)).orderBy(asc(users.fullName));
@@ -1730,19 +1727,6 @@ export const resolvers = {
       if (!project) throw new Error("Project not found");
       await db.delete(projectLinks).where(eq(projectLinks.id, id));
       return true;
-    },
-    linkAuthUser: async (
-      _: unknown,
-      { appUserId }: { appUserId: number },
-      context: Context,
-    ) => {
-      const ownerId = getOwnerId(context);
-      const updated = await db
-        .update(users)
-        .set({ authUserId: ownerId })
-        .where(and(eq(users.id, appUserId), eq(users.ownerId, ownerId)))
-        .returning();
-      return updated.length > 0;
     },
     saveJiraConfig: async (
       _: unknown,
