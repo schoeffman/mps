@@ -141,8 +141,8 @@ function PyramidSlot({ slotIndex, task, onSelect }: { slotIndex: number; task: T
   return (
     <div
       ref={setNodeRef}
-      className={`w-64 h-16 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
-        isOver ? "border-primary bg-primary/5" : task ? "border-border bg-card" : "border-muted-foreground/20 bg-muted/20"
+      className={`w-64 h-16 rounded-lg border-2 flex items-center justify-center transition-colors ${
+        isOver ? "border-primary bg-primary/5 border-dashed" : task ? "border-muted-foreground/60 bg-card" : "border-dashed border-muted-foreground/20 bg-muted/20"
       }`}
     >
       {task ? (
