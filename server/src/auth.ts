@@ -24,7 +24,10 @@ export const auth = betterAuth({
       clientSecret: process.env.APPLE_CLIENT_SECRET!,
     },
   },
-  trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:5173")
-    .split(",")
-    .map((o) => o.trim()),
+  trustedOrigins: [
+    ...(process.env.TRUSTED_ORIGINS || "http://localhost:5173")
+      .split(",")
+      .map((o) => o.trim()),
+    process.env.BETTER_AUTH_URL || "http://localhost:4000",
+  ],
 });

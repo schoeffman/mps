@@ -70,21 +70,21 @@ app.use(
   }),
 );
 
-// Mobile OAuth relay — reads Better Auth session cookie and deep-links into iOS app
-app.get("/auth/mobile-callback", (req, res) => {
-  const cookieHeader = req.headers.cookie ?? "";
-  const cookies = Object.fromEntries(
-    cookieHeader.split(";").map(c => {
-      const [k, ...v] = c.trim().split("=");
-      return [k, decodeURIComponent(v.join("="))];
-    })
-  );
-  const token = cookies["better-auth.session_token"];
-  if (token) {
-    res.redirect(`mps-ios://auth/callback?token=${encodeURIComponent(token)}`);
-  } else {
-    res.redirect("mps-ios://auth/callback?error=no_session");
+// Mobile OAuth relay — fetches the Better Auth session and deep-links into iOS app
+app.get("/auth/mobile-callback", async (req, res) => {
+  try {
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+    const token = session?.session?.token;
+    if (token) {
+      res.redirect(`mps-ios://auth/callback?token=${encodeURIComponent(token)}`);
+      return;
+    }
+  } catch (err) {
+    console.error("mobile-callback session error:", err);
   }
+  res.redirect("mps-ios://auth/callback?error=no_session");
 });
 
 // In production, serve the built Vite SPA
