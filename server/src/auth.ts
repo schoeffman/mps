@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db/index.js";
 import * as schema from "./db/schema.js";
@@ -31,4 +32,5 @@ export const auth = betterAuth({
     process.env.BETTER_AUTH_URL || "http://localhost:4000",
     "https://mps-p.up.railway.app",
   ],
+  plugins: [bearer()],
 });
