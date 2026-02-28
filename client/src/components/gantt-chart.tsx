@@ -60,6 +60,14 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
     type: t.type ?? "task",
   }));
 
+  // The SVAR library sizes its visible-area container by reading the wrapper's
+  // offsetHeight. Without a defined height, height:100% resolves to auto and
+  // overflow-y:auto never fires — tasks below the fold are clipped, not scrollable.
+  // We compute a height proportional to task count, capped at 600px.
+  const CELL_HEIGHT = 38;   // matches SVAR Gantt default cellHeight
+  const HEADER_HEIGHT = 62; // two scale rows (month + day)
+  const chartHeight = Math.max(200, Math.min(svarTasks.length * CELL_HEIGHT + HEADER_HEIGHT, 600));
+
   const thisWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
   const earliestStart = svarTasks.reduce(
     (min, t) => (t.start < min ? t.start : min),
@@ -143,7 +151,7 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
   });
 
   return (
-    <div ref={wrapperRef} className="gantt-chart-wrapper overflow-x-auto border rounded-lg">
+    <div ref={wrapperRef} className="gantt-chart-wrapper overflow-x-auto border rounded-lg" style={{ height: chartHeight }}>
       <style>{`
         .gantt-chart-wrapper .wx-bar.assignee-0 { background-color: #2684ff; }
         .gantt-chart-wrapper .wx-bar.assignee-1 { background-color: #36b37e; }
