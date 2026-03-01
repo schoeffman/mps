@@ -7,6 +7,7 @@ interface Project {
   name: string;
   color: string;
   projectType: string;
+  status: string;
   isSystem: boolean;
 }
 
@@ -35,6 +36,16 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   FeatureDevelopment: "Feature Development",
   Maintenance: "Maintenance",
   Other: "Other",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  "Not Started": "#94a3b8",
+  "In Progress": "#3b82f6",
+  "Complete":    "#22c55e",
+  "Completed":   "#22c55e",
+  "On Hold":     "#f59e0b",
+  "Cancelled":   "#ef4444",
+  "Planned":     "#a78bfa",
 };
 
 interface Slice {
@@ -153,6 +164,25 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
     return result;
   }, [assignments, projectMap, totalSlots]);
 
+  const statusSlices = useMemo(() => {
+    const nonSystemProjects = projects.filter((p) => !p.isSystem);
+    if (nonSystemProjects.length === 0) return [];
+
+    const counts = new Map<string, number>();
+    for (const p of nonSystemProjects) {
+      counts.set(p.status, (counts.get(p.status) ?? 0) + 1);
+    }
+
+    const total = nonSystemProjects.length;
+    return Array.from(counts.entries()).map(([status, count]) => ({
+      label: status,
+      value: count,
+      percentage: Math.round((count / total) * 100),
+      color: STATUS_COLORS[status] ?? "#9ca3af",
+      projectId: null,
+    }));
+  }, [projects]);
+
   if (slices.length === 0) return null;
 
   const cx = 80;
@@ -174,6 +204,16 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
     const startAngle = typeAngle;
     const endAngle = typeAngle + angle;
     typeAngle = endAngle;
+    return { ...slice, d: describeArc(cx, cy, r, startAngle, endAngle) };
+  });
+
+  const statusTotal = statusSlices.reduce((sum, s) => sum + s.value, 0);
+  let statusAngle = -Math.PI / 2;
+  const statusPaths = statusSlices.map((slice) => {
+    const angle = (slice.value / statusTotal) * 2 * Math.PI;
+    const startAngle = statusAngle;
+    const endAngle = statusAngle + angle;
+    statusAngle = endAngle;
     return { ...slice, d: describeArc(cx, cy, r, startAngle, endAngle) };
   });
 
@@ -228,6 +268,31 @@ export function ScheduleCapacityChart({ projects, assignments, totalSlots }: Sch
                 />
                 <span>
                   {s.label} ({s.value} {s.value === 1 ? "week" : "weeks"}): <span className="font-medium">{s.percentage}%</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Project Status breakdown */}
+      {statusPaths.length > 0 && (
+        <div className="flex items-start gap-4">
+          <svg width={160} height={160} viewBox="0 0 160 160" className="shrink-0">
+            {statusPaths.map((p, i) => (
+              <path key={i} d={p.d} fill={p.color} stroke="white" strokeWidth={1.5} />
+            ))}
+          </svg>
+          <div className="flex flex-col gap-1.5 py-1">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">By Status</span>
+            {statusSlices.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span
+                  className="inline-block w-3 h-3 rounded-sm shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span>
+                  {s.label} ({s.value} {s.value === 1 ? "project" : "projects"}): <span className="font-medium">{s.percentage}%</span>
                 </span>
               </div>
             ))}
