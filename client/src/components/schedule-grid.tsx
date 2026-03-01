@@ -2,9 +2,10 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { gql, useMutation } from "@apollo/client";
 import { formatWeekHeader, getHolidaysInWeek, isCurrentWeek } from "@/lib/schedule-utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { Flag } from "lucide-react";
+import { Flag, Paintbrush } from "lucide-react";
 import { getProjectColor } from "@/lib/project-colors";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScheduleCell } from "./schedule-cell";
 import { RowProjectPicker } from "./row-project-picker";
 import { ColumnProjectPicker } from "./column-project-picker";
@@ -244,46 +245,53 @@ export function ScheduleGrid({ scheduleId, teams, projects, assignments, weekSta
     });
   }, [currentWeekStart]);
 
-  const handleChipClick = (id: number | "eraser") => {
-    if (activeProjectId === id) {
-      handleSave();
-    } else {
-      setPaintedCells(new Set());
-      setActiveProjectId(id);
-    }
-  };
+  const handleCancel = useCallback(() => {
+    setPaintedCells(new Set());
+    setActiveProjectId(null);
+  }, []);
 
   return (
     <div className="space-y-3">
       {/* Paint mode toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-muted-foreground mr-1">Paint mode:</span>
-        {assignableProjects.map((p) => {
-          const chipColor = projectChipColorMap.get(p.id) ?? "";
-          const isActive = activeProjectId === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => handleChipClick(p.id)}
-              className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer ${chipColor} ${
-                isActive ? "ring-2 ring-primary ring-offset-1 scale-105" : "opacity-70 hover:opacity-100"
-              }`}
-            >
-              {isActive ? "Save" : p.name}
-            </button>
-          );
-        })}
-        <button
-          onClick={() => handleChipClick("eraser")}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 transition-all cursor-pointer ${
-            activeProjectId === "eraser" ? "ring-2 ring-primary ring-offset-1 scale-105" : "opacity-70 hover:opacity-100"
-          }`}
+        <span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mr-1">
+          <Paintbrush className="h-4 w-4" />
+          Paint mode:
+        </span>
+        <Select
+          value={activeProjectId === null ? "" : activeProjectId === "eraser" ? "eraser" : String(activeProjectId)}
+          onValueChange={(val) => {
+            setPaintedCells(new Set());
+            if (val === "eraser") {
+              setActiveProjectId("eraser");
+            } else {
+              setActiveProjectId(parseInt(val, 10));
+            }
+          }}
         >
-          Eraser
+          <SelectTrigger size="sm" className="w-[180px] text-xs cursor-pointer">
+            <SelectValue placeholder="Select project…" />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start">
+            {assignableProjects.map((p) => (
+              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+            ))}
+            <SelectItem value="eraser">Eraser</SelectItem>
+          </SelectContent>
+        </Select>
+        <button
+          onClick={handleSave}
+          disabled={paintedCells.size === 0}
+          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+        >
+          Save
         </button>
-        {isPaintMode && (
-          <span className="text-xs text-muted-foreground ml-2">(Press Escape to cancel)</span>
-        )}
+        <button
+          onClick={handleCancel}
+          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent transition-colors"
+        >
+          Cancel
+        </button>
       </div>
 
       <div ref={scrollContainerRef} className="overflow-auto border rounded-lg relative isolate">
